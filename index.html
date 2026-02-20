@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#f97316">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="description" content="Conversor de Bitcoin y seguimiento de precios en tiempo real">
+  <title>SatsFlow</title>
+
+  <link rel="manifest" href="/manifest.json">
+  <link rel="icon" type="image/png" href="https://upload.wikimedia.org/wikipedia/commons/thumb/4/46/Bitcoin.svg/64px-Bitcoin.svg.png">
+  <link rel="apple-touch-icon" href="https://upload.wikimedia.org/wikipedia/commons/thumb/4/46/Bitcoin.svg/180px-Bitcoin.svg.png">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #0f172a;
+      color: #f8fafc;
+      padding-top: env(safe-area-inset-top);
+      padding-bottom: env(safe-area-inset-bottom);
+      padding-left: env(safe-area-inset-left);
+      padding-right: env(safe-area-inset-right);
+      overscroll-behavior-y: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: #0f172a; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .animate-fadeIn { animation: fadeIn 0.4s ease-out; }
+    .congestion-bar { transition: width 1.2s ease; }
+    input, select, textarea { font-size: 16px !important; }
+  </style>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "lucide-react":    "https://aistudiocdn.com/lucide-react@^0.554.0",
+      "react-dom/client":"https://aistudiocdn.com/react-dom@^19.2.0/client",
+      "react-dom":       "https://aistudiocdn.com/react-dom@^19.2.0",
+      "react":           "https://aistudiocdn.com/react@^19.2.0",
+      "recharts":        "https://aistudiocdn.com/recharts@^3.5.0",
+      "react-dom/":      "https://aistudiocdn.com/react-dom@^19.2.0/",
+      "react/":          "https://aistudiocdn.com/react@^19.2.0/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <div id="root"></div>
+
+  <!-- ── Service Worker + IndexedDB bootstrap ───────────────────────────── -->
+  <script>
+    /* IndexedDB helper compartida con el SW */
+    function openDB() {
+      return new Promise((resolve, reject) => {
+        const req = indexedDB.open('satsflow', 1);
+        req.onupgradeneeded = (e) => {
+          const db = e.target.result;
+          if (!db.objectStoreNames.contains('alerts')) db.createObjectStore('alerts', { keyPath: 'id' });
+          if (!db.objectStoreNames.contains('meta'))   db.createObjectStore('meta',   { keyPath: 'key' });
+        };
+        req.onsuccess = (e) => resolve(e.target.result);
+        req.onerror   = (e) => reject(e.target.error);
+      });
+    }
+
+    window.dbHelpers = {
+      async saveAlerts(alerts) {
+        try {
+          const db    = await openDB();
+          const tx    = db.transaction('alerts', 'readwrite');
+          const store = tx.objectStore('alerts');
+          store.clear();
+          for (const a of alerts) store.put(a);
+          return new Promise((res, rej) => { tx.oncomplete = res; tx.onerror = rej; });
+        } catch(e) { console.warn('DB save error', e); }
+      },
+      async loadAlerts() {
+        try {
+          const db = await openDB();
+          const tx = db.transaction('alerts', 'readonly');
+          return new Promise(res => {
+            const req = tx.objectStore('alerts').getAll();
+            req.onsuccess = () => res(req.result || []);
+            req.onerror   = () => res([]);
+          });
+        } catch { return []; }
+      }
+    };
+
+    /* Registro del Service Worker */
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', async () => {
+        try {
+          const reg = await navigator.serviceWorker.register('/sw.js');
+          console.log('[PWA] SW registrado:', reg.scope);
+
+          /* Periodic Background Sync — Chrome Android 80+ */
+          if ('periodicSync' in reg) {
+            try {
+              const perm = await navigator.permissions.query({ name: 'periodic-background-sync' });
+              if (perm.state === 'granted') {
+                await reg.periodicSync.register('price-check', { minInterval: 15 * 60 * 1000 });
+                console.log('[PWA] Periodic background sync activado cada 15 min');
+              }
+            } catch(e) { console.log('[PWA] Periodic sync no disponible:', e.message); }
+          }
+        } catch(e) {
+          console.warn('[PWA] SW no pudo registrarse:', e.message);
+        }
+      });
+    }
+  </script>
+
+  <!-- ── React App ──────────────────────────────────────────────────────── -->
+  <script type="text/babel" data-type="module">
+    import React, { useState, useEffect, useCallback, useRef } from 'react';
+    import ReactDOM from 'react-dom/client';
+    import {
+      RefreshCw, ArrowRightLeft, TrendingUp, Bell, BellPlus, Trash2,
+      AlertTriangle, Bitcoin, Download, X, Zap, Activity, Info,
+      ChevronUp, ChevronDown, CheckCircle
+    } from 'lucide-react';
+    import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+
+    /* ═══ APIs ══════════════════════════════════════════════════════════════ */
+    const GKO     = 'https://api.coingecko.com/api/v3';
+    const MEMPOOL = 'https://mempool.space/api';
+
+    const fetchBitcoinData = async (days = '7') => {
+      try {
+        const [pr, hr] = await Promise.all([
+          fetch(`${GKO}/simple/price?ids=bitcoin&vs_currencies=usd,eur&include_24hr_change=true`),
+          fetch(`${GKO}/coins/bitcoin/market_chart?vs_currency=usd&days=${days}`)
+        ]);
+        const pj = await pr.json();
+        const hj = await hr.json();
+        const history = hj.prices.map(([ts, price]) => {
+          const d = new Date(ts);
+          const label = days === '1'
+            ? d.toLocaleTimeString('es-ES', { hour:'2-digit', minute:'2-digit' })
+            : days === '7' || days === '30'
+              ? d.toLocaleDateString('es-ES', { month:'numeric', day:'numeric' })
+              : d.toLocaleDateString('es-ES', { month:'short', year:'2-digit' });
+          return { date: label, fullDate: d.toLocaleString(), price };
+        });
+        return {
+          current_price: { usd: pj.bitcoin.usd, eur: pj.bitcoin.eur },
+          change24h: pj.bitcoin.usd_24h_change || 0,
+          history
+        };
+      } catch {
+        return { current_price: { usd:0, eur:0 }, change24h:0, history:[] };
+      }
+    };
+
+    const fetchMempoolData = async () => {
+      try {
+        const [fr, sr, br] = await Promise.all([
+          fetch(`${MEMPOOL}/v1/fees/recommended`),
+          fetch(`${MEMPOOL}/mempool`),
+          fetch(`${MEMPOOL}/v1/blocks`)
+        ]);
+        const fees   = await fr.json();
+        const stats  = await sr.json();
+        const blocks = await br.json();
+        const txCount   = stats.count || 0;
+        const last      = blocks[0] || {};
+        const height    = last.height || 0;
+        const next      = Math.ceil(height / 210000) * 210000;
+        return {
+          fees: {
+            fastest:  fees.fastestFee  || 0,
+            halfHour: fees.halfHourFee || 0,
+            hour:     fees.hourFee     || 0,
+            economy:  fees.economyFee  || 0,
+            minimum:  fees.minimumFee  || 1
+          },
+          mempool: { txCount, vsize: Math.round((stats.vsize||0)/1e6), congestion: Math.min(100, Math.round((txCount/150000)*100)) },
+          network: { height, nextHalving: next, blocksToHalving: next - height }
+        };
+      } catch { return null; }
+    };
+
+    /* ═══ Notification helpers ══════════════════════════════════════════════ */
+    const requestNotifPerm = () => window.Notification
+      ? Notification.requestPermission()
+      : Promise.resolve('unsupported');
+
+    const showNotif = (title, body) => {
+      if (Notification.permission !== 'granted') return;
+      const opts = {
+        body, icon: 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/46/Bitcoin.svg/192px-Bitcoin.svg.png',
+        badge: 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/46/Bitcoin.svg/96px-Bitcoin.svg.png',
+        vibrate: [300, 100, 300], tag: 'satsflow-alert', renotify: true
+      };
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.ready.then(reg => reg.showNotification(title, opts));
+      } else {
+        new Notification(title, opts);
+      }
+    };
+
+    /* ═══ InstallPrompt ════════════════════════════════════════════════════ */
+    const InstallPrompt = () => {
+      const [prompt,    setPrompt]    = useState(null);
+      const [modal,     setModal]     = useState(false);
+      const [installed, setInstalled] = useState(false);
+
+      useEffect(() => {
+        if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone) {
+          setInstalled(true); return;
+        }
+        const h = e => { e.preventDefault(); setPrompt(e); };
+        window.addEventListener('beforeinstallprompt', h);
+        return () => window.removeEventListener('beforeinstallprompt', h);
+      }, []);
+
+      if (installed) return null;
+
+      const handle = async () => {
+        if (prompt) { prompt.prompt(); await prompt.userChoice; setPrompt(null); }
+        else setModal(true);
+      };
+
+      return (
+        <>
+          <button onClick={handle}
+            className="p-2 bg-slate-800 text-slate-300 hover:text-white rounded-lg border border-slate-700 hover:bg-slate-700 transition-colors flex items-center gap-2 text-sm font-medium">
+            <Download className="w-4 h-4" /><span className="hidden sm:inline">Instalar</span>
+          </button>
+          {modal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
+              <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-sm w-full shadow-2xl relative">
+                <button onClick={() => setModal(false)} className="absolute top-4 right-4 text-slate-400 hover:text-white">
+                  <X className="w-5 h-5" />
+                </button>
+                <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                  <Download className="w-5 h-5 text-orange-500" /> Instalar SatsFlow en Android
+                </h3>
+                <div className="space-y-3 text-sm">
+                  {[
+                    'Pulsa el menú del navegador (⋮ o el icono de compartir).',
+                    'Selecciona "Instalar aplicación" o "Añadir a pantalla de inicio".',
+                    'La app se instalará con icono propio y recibirás notificaciones aunque esté cerrada.'
+                  ].map((t, i) => (
+                    <div key={i} className="bg-slate-800 p-3 rounded-lg flex gap-3">
+                      <span className="w-6 h-6 rounded-full bg-orange-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">{i+1}</span>
+                      <p className="text-slate-300">{t}</p>
+                    </div>
+                  ))}
+                </div>
+                <button onClick={() => setModal(false)}
+                  className="mt-5 w-full bg-orange-500 hover:bg-orange-600 text-white font-medium py-2 rounded-lg transition-colors">
+                  Entendido
+                </button>
+              </div>
+            </div>
+          )}
+        </>
+      );
+    };
+
+    /* ═══ Converter ════════════════════════════════════════════════════════ */
+    const Converter = ({ btcPriceUsd, btcPriceEur }) => {
+      const [btc,  setBtc]  = useState('1');
+      const [sats, setSats] = useState('100000000');
+      const [usd,  setUsd]  = useState('');
+      const [eur,  setEur]  = useState('');
+
+      useEffect(() => { if (btcPriceUsd > 0 && btc) calc('btc', btc, btcPriceUsd, btcPriceEur); }, [btcPriceUsd, btcPriceEur]);
+
+      function calc(field, raw, pU = btcPriceUsd, pE = btcPriceEur) {
+        const f = parseFloat(raw), ok = !isNaN(f) && f >= 0;
+        if (field==='btc')  { setBtc(raw);  ok?(setSats((f*1e8).toFixed(0)),setUsd((f*pU).toFixed(2)),setEur((f*pE).toFixed(2))):(setSats(''),setUsd(''),setEur('')); }
+        if (field==='sats') { setSats(raw); if(ok){const b=f/1e8;setBtc(b.toFixed(8).replace(/\.?0+$/,''));setUsd((b*pU).toFixed(2));setEur((b*pE).toFixed(2));}else{setBtc('');setUsd('');setEur('');} }
+        if (field==='usd')  { setUsd(raw);  if(ok&&pU){const b=f/pU;setBtc(b.toFixed(8));setSats((b*1e8).toFixed(0));setEur((b*pE).toFixed(2));}else{setBtc('');setSats('');setEur('');} }
+        if (field==='eur')  { setEur(raw);  if(ok&&pE){const b=f/pE;setBtc(b.toFixed(8));setSats((b*1e8).toFixed(0));setUsd((b*pU).toFixed(2));}else{setBtc('');setSats('');setUsd('');} }
+      }
+
+      const fmt = (v) => isNaN(v) ? '' : Number(v).toLocaleString('en-US', { maximumFractionDigits:2 });
+
+      return (
+        <div className="bg-slate-800 p-6 rounded-2xl shadow-lg border border-slate-700">
+          <h2 className="text-xl font-semibold text-white flex items-center gap-2 mb-6">
+            <ArrowRightLeft className="w-5 h-5 text-orange-500" /> Conversor
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {[
+              {id:'btc', label:'Bitcoin (BTC)',  icon:'₿', color:'orange', val:btc},
+              {id:'sats',label:'Satoshis (Sats)',icon:'⚡',color:'yellow',val:sats},
+              {id:'usd', label:'Dólar (USD)',    icon:'$', color:'green',  val:usd},
+              {id:'eur', label:'Euro (EUR)',      icon:'€', color:'blue',   val:eur},
+            ].map(({id,label,icon,color,val}) => (
+              <div key={id}>
+                <label className="block text-xs font-medium text-slate-400 mb-1">{label}</label>
+                <div className="relative">
+                  <input type="number" value={val} onChange={e=>calc(id,e.target.value)}
+                    className={`w-full bg-slate-900 text-white rounded-lg p-3 pl-10 border border-slate-700 focus:border-${color}-500 focus:ring-1 focus:ring-${color}-500 outline-none transition-all`}
+                    placeholder="0"/>
+                  <span className={`absolute left-3 top-3.5 text-${color}-500 font-bold`}>{icon}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+          <p className="mt-4 text-xs text-slate-500 text-center">
+            1 BTC ≈ ${fmt(btcPriceUsd)} USD / €{fmt(btcPriceEur)} EUR
+          </p>
+        </div>
+      );
+    };
+
+    /* ═══ PriceChart ═══════════════════════════════════════════════════════ */
+    const PriceChart = ({ data, selectedDays, onDaysChange, loading }) => {
+      if (!data?.length) return (
+        <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700 h-[350px] flex items-center justify-center text-slate-500">
+          <span className="flex items-center gap-2"><RefreshCw className="w-4 h-4 animate-spin"/> Cargando gráfico...</span>
+        </div>
+      );
+      const last = data[data.length-1]?.price||0, first=data[0]?.price||0;
+      const pos  = last>=first, color=pos?'#10b981':'#ef4444';
+      const pct  = first?((last-first)/first*100).toFixed(2):'0.00';
+      const periods = [{ label:'24h',value:'1'},{label:'7D',value:'7'},{label:'30D',value:'30'},{label:'90D',value:'90'},{label:'1A',value:'365'}];
+
+      return (
+        <div className="bg-slate-800 p-6 rounded-2xl shadow-lg border border-slate-700">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
+            <div>
+              <h2 className="text-xl font-semibold text-white flex items-center gap-2">
+                <TrendingUp className="w-5 h-5 text-orange-500"/> Historial
+              </h2>
+              <span className={`mt-1 inline-block text-sm font-medium px-2 py-0.5 rounded ${pos?'bg-emerald-500/10 text-emerald-400':'bg-red-500/10 text-red-400'}`}>
+                {pos?'+':''}{pct}% <span className="text-slate-500 text-xs ml-1">en este periodo</span>
+              </span>
+            </div>
+            <div className="flex bg-slate-900 p-1 rounded-lg border border-slate-700 w-full sm:w-auto">
+              {periods.map(p=>(
+                <button key={p.value} onClick={()=>onDaysChange(p.value)} disabled={loading}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all flex-1 sm:flex-none ${selectedDays===p.value?'bg-slate-700 text-white':'text-slate-400 hover:text-white hover:bg-slate-800'}`}>
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="h-[250px] relative">
+            {loading&&<div className="absolute inset-0 bg-slate-800/70 z-10 flex items-center justify-center rounded-lg backdrop-blur-sm"><RefreshCw className="w-8 h-8 text-orange-500 animate-spin"/></div>}
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={data}>
+                <defs>
+                  <linearGradient id="gP" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%"  stopColor={color} stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor={color} stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155"/>
+                <XAxis dataKey="date" stroke="#94a3b8" tick={{fontSize:10}} tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={30}/>
+                <YAxis stroke="#94a3b8" tick={{fontSize:10}} tickFormatter={v=>`$${(v/1000).toFixed(0)}k`} tickLine={false} axisLine={false} domain={['auto','auto']} width={42}/>
+                <Tooltip
+                  contentStyle={{background:'#1e293b',border:'1px solid #334155',borderRadius:'8px',color:'#fff'}}
+                  labelFormatter={(l,p)=>p[0]?.payload?.fullDate||l}
+                  formatter={v=>[`$${v.toLocaleString()}`,'Precio']}/>
+                <Area type="monotone" dataKey="price" stroke={color} fill="url(#gP)" strokeWidth={2} animationDuration={800}/>
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      );
+    };
+
+    /* ═══ MempoolPanel ═════════════════════════════════════════════════════ */
+    const MempoolPanel = ({ btcPriceUsd, mempoolData, loading, onRefresh }) => {
+      const [txSize,   setTxSize]   = useState('250');
+      const [feeLevel, setFeeLevel] = useState('hour');
+      const [info,     setInfo]     = useState(false);
+
+      if (loading&&!mempoolData) return (
+        <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700 h-48 flex items-center justify-center">
+          <span className="flex items-center gap-2 text-slate-500"><RefreshCw className="w-4 h-4 animate-spin"/> Cargando Mempool...</span>
+        </div>
+      );
+      if (!mempoolData) return (
+        <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700 h-48 flex items-center justify-center">
+          <p className="text-slate-500 text-sm text-center">No se pudo cargar la Mempool.<br/>Comprueba tu conexión.</p>
+        </div>
+      );
+
+      const { fees, mempool, network } = mempoolData;
+      const cong = mempool.congestion;
+      const congLabel = cong<20?'🟢 Baja':cong<50?'🟡 Media':cong<80?'🟠 Alta':'🔴 Muy alta';
+      const congColor = cong<20?'bg-emerald-500':cong<50?'bg-yellow-500':cong<80?'bg-orange-500':'bg-red-500';
+      const feeColor  = f => f<=5?'text-emerald-400':f<=30?'text-yellow-400':f<=80?'text-orange-400':'text-red-400';
+      const selRate   = fees[feeLevel]||fees.hour;
+      const sz        = Math.max(1,parseInt(txSize)||250);
+      const totSats   = selRate*sz;
+      const totUsd    = btcPriceUsd>0?((totSats/1e8)*btcPriceUsd).toFixed(4):'—';
+      const daysHalv  = network.blocksToHalving>0?Math.round((network.blocksToHalving*10)/1440):null;
+
+      const cards = [
+        {label:'Rápido',   fee:fees.fastest,  time:'~10 min',border:'border-red-500/30',   icon:'⚡'},
+        {label:'30 min',   fee:fees.halfHour, time:'~30 min',border:'border-orange-500/30',icon:'🟠'},
+        {label:'1 hora',   fee:fees.hour,     time:'~60 min',border:'border-yellow-500/30',icon:'🕐'},
+        {label:'Económica',fee:fees.economy,  time:'Horas',  border:'border-blue-500/30',  icon:'💤'},
+      ];
+
+      return (
+        <div className="bg-slate-800 p-6 rounded-2xl shadow-lg border border-slate-700 space-y-5">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-semibold text-white flex items-center gap-2">
+              <Activity className="w-5 h-5 text-purple-400"/> Mempool &amp; Fees
+            </h2>
+            <div className="flex gap-2">
+              <button onClick={()=>setInfo(v=>!v)} className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-700">
+                <Info className="w-4 h-4"/>
+              </button>
+              <button onClick={onRefresh} className={`p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-700 ${loading?'animate-spin':''}`}>
+                <RefreshCw className="w-4 h-4"/>
+              </button>
+            </div>
+          </div>
+
+          {info&&(
+            <div className="bg-slate-900/80 border border-slate-700 rounded-xl p-4 text-xs text-slate-400 space-y-1 animate-fadeIn">
+              <p><span className="text-white font-medium">sat/vByte</span> — tarifa por byte virtual de la transacción.</p>
+              <p><span className="text-white font-medium">Mempool</span> — cola de transacciones pendientes de confirmar en la blockchain.</p>
+              <p>Datos en tiempo real de <span className="text-purple-400">mempool.space</span>. Actualización automática cada 30 s.</p>
+            </div>
+          )}
+
+          {/* Congestion */}
+          <div>
+            <div className="flex justify-between text-xs mb-1.5">
+              <span className="text-slate-400">Congestión de red</span>
+              <span className="font-medium text-white">{congLabel}</span>
+            </div>
+            <div className="w-full bg-slate-900 rounded-full h-2.5 overflow-hidden">
+              <div className={`h-2.5 rounded-full congestion-bar ${congColor}`} style={{width:`${cong}%`}}/>
+            </div>
+            <div className="flex justify-between text-[10px] text-slate-600 mt-1">
+              <span>{mempool.txCount.toLocaleString()} tx pendientes</span>
+              <span>{mempool.vsize} MB en cola</span>
+            </div>
+          </div>
+
+          {/* Fee cards */}
+          <div className="grid grid-cols-4 gap-2">
+            {cards.map(({label,fee,time,border,icon})=>(
+              <div key={label} className={`bg-slate-900/80 rounded-xl p-2.5 border ${border} flex flex-col items-center gap-1 text-center`}>
+                <span className="text-base">{icon}</span>
+                <span className="text-[9px] text-slate-400 uppercase tracking-wide font-medium leading-tight">{label}</span>
+                <span className={`text-lg font-bold font-mono ${feeColor(fee)}`}>{fee}</span>
+                <span className="text-[9px] text-slate-500">sat/vB</span>
+                <span className="text-[9px] text-slate-400">{time}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Calculator */}
+          <div className="bg-slate-900/60 rounded-xl p-4 border border-slate-700/60">
+            <p className="text-sm font-medium text-white mb-3 flex items-center gap-2">
+              <Zap className="w-4 h-4 text-yellow-400"/> Calculadora de tarifa
+            </p>
+            <div className="grid grid-cols-2 gap-3 mb-3">
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Tamaño tx (bytes)</label>
+                <input type="number" value={txSize} onChange={e=>setTxSize(e.target.value)} min="1" max="100000"
+                  className="w-full bg-slate-800 text-white rounded-lg px-3 py-2 border border-slate-600 focus:border-purple-500 outline-none text-sm"/>
+              </div>
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Prioridad</label>
+                <select value={feeLevel} onChange={e=>setFeeLevel(e.target.value)}
+                  className="w-full bg-slate-800 text-white rounded-lg px-3 py-2 border border-slate-600 focus:border-purple-500 outline-none text-sm">
+                  <option value="fastest">⚡ Rápido (~10 min)</option>
+                  <option value="halfHour">🟠 30 minutos</option>
+                  <option value="hour">🕐 1 hora</option>
+                  <option value="economy">💤 Económica</option>
+                  <option value="minimum">🐢 Mínima</option>
+                </select>
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-2 text-center">
+              {[
+                {label:'sat/vByte',    val:selRate,              color:'text-yellow-400'},
+                {label:'Sats totales', val:totSats.toLocaleString(), color:'text-orange-400'},
+                {label:'Coste USD',    val:`$${totUsd}`,         color:'text-green-400'},
+              ].map(({label,val,color})=>(
+                <div key={label} className="bg-slate-800 rounded-lg p-2">
+                  <p className="text-[10px] text-slate-500">{label}</p>
+                  <p className={`text-base font-bold font-mono ${color}`}>{val}</p>
+                </div>
+              ))}
+            </div>
+            <p className="text-[10px] text-slate-600 mt-2 text-center">
+              P2PKH ≈ 250 B · SegWit P2WPKH ≈ 140 B · Taproot P2TR ≈ 110 B
+            </p>
+          </div>
+
+          {/* Network */}
+          {network.height>0&&(
+            <div className="grid grid-cols-2 gap-2 text-center">
+              <div className="bg-slate-900/60 rounded-xl p-3 border border-slate-700/40">
+                <p className="text-[10px] text-slate-500 uppercase tracking-wider">Bloque actual</p>
+                <p className="text-base font-bold text-white font-mono mt-0.5">#{network.height.toLocaleString()}</p>
+              </div>
+              <div className="bg-slate-900/60 rounded-xl p-3 border border-slate-700/40">
+                <p className="text-[10px] text-slate-500 uppercase tracking-wider">Próximo Halving</p>
+                <p className="text-base font-bold text-orange-400 font-mono mt-0.5">{daysHalv!=null?`~${daysHalv} días`:'—'}</p>
+                <p className="text-[10px] text-slate-600">{network.blocksToHalving.toLocaleString()} bloques</p>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    };
+
+    /* ═══ Alerts ═══════════════════════════════════════════════════════════ */
+    const Alerts = ({ currentPriceUsd, currentPriceEur }) => {
+      const [alerts,    setAlerts]    = useState([]);
+      const [target,    setTarget]    = useState('');
+      const [currency,  setCurrency]  = useState('usd');
+      const [notifPerm, setNotifPerm] = useState('default');
+      const [notifMsg,  setNotifMsg]  = useState('');
+
+      /* Cargar alertas guardadas al inicio */
+      useEffect(()=>{
+        window.dbHelpers?.loadAlerts().then(saved=>{ if(saved.length) setAlerts(saved); });
+        setNotifPerm(window.Notification?.permission||'unsupported');
+      },[]);
+
+      /* Persistir en IndexedDB y sincronizar con SW */
+      useEffect(()=>{
+        if(!alerts.length) return;
+        window.dbHelpers?.saveAlerts(alerts);
+        navigator.serviceWorker?.ready.then(reg=>{
+          reg.active?.postMessage({ type:'CHECK_ALERTS', alerts });
+        });
+      },[alerts]);
+
+      /* Comprobar alertas cuando cambia el precio */
+      useEffect(()=>{
+        if(!currentPriceUsd) return;
+        let changed=false;
+        const updated = alerts.map(a=>{
+          if(a.triggered) return a;
+          const p = a.currency==='usd'?currentPriceUsd:currentPriceEur;
+          const hit = a.condition==='above'?p>=a.targetPrice:p<=a.targetPrice;
+          if(hit){
+            const sym=a.currency==='usd'?'$':'€';
+            showNotif('⚡ Alerta SatsFlow',
+              `BTC ha ${a.condition==='above'?'subido sobre':'bajado de'} ${sym}${a.targetPrice.toLocaleString()} — Precio: $${currentPriceUsd.toLocaleString()}`
+            );
+            changed=true;
+            return {...a, triggered:true};
+          }
+          return a;
+        });
+        if(changed) setAlerts(updated);
+      },[currentPriceUsd, currentPriceEur]);
+
+      const activateNotifs = async ()=>{
+        const r = await requestNotifPerm();
+        setNotifPerm(r);
+        setNotifMsg(r==='granted'?'✅ Notificaciones activadas':r==='denied'?'❌ Permiso denegado. Actívalas en Ajustes del navegador.':'');
+      };
+
+      const addAlert = ()=>{
+        const val=parseFloat(target);
+        if(isNaN(val)||val<=0) return;
+        const price = currency==='usd'?currentPriceUsd:currentPriceEur;
+        setAlerts(prev=>[...prev,{id:Date.now().toString(),targetPrice:val,currency,condition:val>price?'above':'below',triggered:false}]);
+        setTarget('');
+      };
+
+      return (
+        <div className="bg-slate-800 p-6 rounded-2xl shadow-lg border border-slate-700 flex flex-col">
+          <h2 className="text-xl font-semibold text-white flex items-center gap-2 mb-4">
+            <Bell className="w-5 h-5 text-orange-500"/> Alertas de precio
+          </h2>
+
+          {/* Notification permission banner */}
+          {'Notification' in window && notifPerm!=='granted' && (
+            <div className="mb-4 bg-orange-500/10 border border-orange-500/30 rounded-xl p-3 flex items-start gap-3">
+              <Bell className="w-4 h-4 text-orange-400 mt-0.5 flex-shrink-0"/>
+              <div className="flex-1">
+                <p className="text-xs text-orange-300 font-medium">Activa las notificaciones</p>
+                <p className="text-xs text-slate-400 mt-0.5">Para recibir alertas con la app cerrada necesitas dar permiso.</p>
+                {notifMsg&&<p className="text-xs mt-1 text-slate-300">{notifMsg}</p>}
+              </div>
+              <button onClick={activateNotifs}
+                className="bg-orange-500 hover:bg-orange-600 text-white text-xs px-3 py-1.5 rounded-lg transition-colors flex-shrink-0">
+                Activar
+              </button>
+            </div>
+          )}
+
+          {notifPerm==='granted'&&(
+            <div className="mb-4 bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-3 flex items-center gap-2">
+              <CheckCircle className="w-4 h-4 text-emerald-400 flex-shrink-0"/>
+              <p className="text-xs text-emerald-300">Notificaciones activas. Recibirás avisos aunque la app esté cerrada.</p>
+            </div>
+          )}
+
+          {/* Add alert */}
+          <div className="flex gap-2 mb-4">
+            <div className="relative flex-1">
+              <span className="absolute left-3 top-2.5 text-slate-500 text-sm">{currency==='usd'?'$':'€'}</span>
+              <input type="number" value={target} onChange={e=>setTarget(e.target.value)}
+                onKeyDown={e=>e.key==='Enter'&&addAlert()}
+                className="w-full bg-slate-900 text-white rounded-lg py-2 pl-7 pr-3 border border-slate-700 focus:border-orange-500 outline-none text-sm"
+                placeholder="Precio objetivo"/>
+            </div>
+            <select value={currency} onChange={e=>setCurrency(e.target.value)}
+              className="bg-slate-900 text-white rounded-lg px-2 border border-slate-700 outline-none text-sm">
+              <option value="usd">USD</option>
+              <option value="eur">EUR</option>
+            </select>
+            <button onClick={addAlert}
+              className="bg-orange-500 hover:bg-orange-600 text-white p-2 rounded-lg transition-colors flex-shrink-0">
+              <BellPlus className="w-5 h-5"/>
+            </button>
+          </div>
+
+          {/* List */}
+          <div className="space-y-2 overflow-y-auto max-h-64">
+            {alerts.length===0?(
+              <p className="text-center text-slate-500 text-sm py-6">Sin alertas activas.<br/>Introduce un precio y pulsa +.</p>
+            ):alerts.map(a=>(
+              <div key={a.id}
+                className={`flex items-center justify-between p-3 rounded-xl border ${a.triggered?'bg-yellow-500/10 border-yellow-500/40':'bg-slate-700/40 border-slate-600/60'}`}>
+                <div className="flex items-center gap-3 min-w-0">
+                  {a.triggered
+                    ?<AlertTriangle className="w-5 h-5 text-yellow-500 animate-pulse flex-shrink-0"/>
+                    :<div className={`w-2 h-2 rounded-full flex-shrink-0 ${a.condition==='above'?'bg-green-500':'bg-red-500'}`}/>
+                  }
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-white">
+                      {a.condition==='above'?'↑ Subir de':'↓ Bajar de'} {a.currency==='usd'?'$':'€'}{a.targetPrice.toLocaleString()}
+                    </p>
+                    <p className="text-xs text-slate-400">{a.triggered?'¡DISPARADA!':'Pendiente'}</p>
+                  </div>
+                </div>
+                <button onClick={()=>setAlerts(prev=>prev.filter(x=>x.id!==a.id))} className="text-slate-500 hover:text-red-400 p-1 flex-shrink-0">
+                  <Trash2 className="w-4 h-4"/>
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    };
+
+    /* ═══ App ══════════════════════════════════════════════════════════════ */
+    const App = () => {
+      const [data,    setData]    = useState({ current_price:{usd:0,eur:0}, change24h:0, history:[] });
+      const [mempool, setMempool] = useState(null);
+      const [days,    setDays]    = useState('7');
+      const [lChart,  setLC]      = useState(false);
+      const [lMem,    setLM]      = useState(true);
+      const [lastUpd, setLU]      = useState(null);
+
+      const loadP = useCallback(async (d=days)=>{ if(d!==days)setLC(true); const nd=await fetchBitcoinData(d); setData(nd); setLC(false); setLU(new Date()); },[days]);
+      const loadM = useCallback(async ()=>{ setLM(true); setMempool(await fetchMempoolData()); setLM(false); },[]);
+
+      useEffect(()=>{
+        loadP(); loadM();
+        const pi=setInterval(()=>loadP(days),60000);
+        const mi=setInterval(loadM,30000);
+        return ()=>{ clearInterval(pi); clearInterval(mi); };
+      },[days]);
+
+      const ch=data.change24h||0, pos=ch>=0;
+
+      return (
+        <div className="min-h-screen bg-slate-950 px-4 sm:px-6 lg:px-8 pb-10">
+          <div className="max-w-6xl mx-auto space-y-6 mt-4 sm:mt-8">
+
+            {/* Header */}
+            <header className="flex items-center justify-between pb-5 border-b border-slate-800">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-orange-500 rounded-full flex items-center justify-center shadow-lg shadow-orange-500/20">
+                  <Bitcoin className="w-6 h-6 sm:w-7 sm:h-7 text-white"/>
+                </div>
+                <div>
+                  <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">SatsFlow</h1>
+                  <p className="text-slate-400 text-xs sm:text-sm">Bitcoin Tracker</p>
+                </div>
+              </div>
+              <div className="flex flex-col items-end gap-2">
+                <InstallPrompt/>
+                <div className="text-right">
+                  <p className="text-[10px] text-slate-500 uppercase tracking-wider hidden sm:block">Precio Actual</p>
+                  <p className="text-xl sm:text-2xl font-mono text-white font-bold">
+                    ${data.current_price.usd.toLocaleString()}
+                  </p>
+                  {ch!==0&&(
+                    <p className={`text-xs font-medium flex items-center justify-end gap-0.5 ${pos?'text-emerald-400':'text-red-400'}`}>
+                      {pos?<ChevronUp className="w-3 h-3"/>:<ChevronDown className="w-3 h-3"/>}
+                      {Math.abs(ch).toFixed(2)}% hoy
+                    </p>
+                  )}
+                  {lastUpd&&<p className="text-[10px] text-slate-600">Act. {lastUpd.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})}</p>}
+                </div>
+              </div>
+            </header>
+
+            {/* Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-2 space-y-6">
+                <Converter btcPriceUsd={data.current_price.usd} btcPriceEur={data.current_price.eur}/>
+                <PriceChart data={data.history} selectedDays={days} onDaysChange={d=>{setDays(d);loadP(d);}} loading={lChart}/>
+                <div className="lg:hidden">
+                  <MempoolPanel btcPriceUsd={data.current_price.usd} mempoolData={mempool} loading={lMem} onRefresh={loadM}/>
+                </div>
+              </div>
+              <div className="space-y-6 flex flex-col">
+                <div className="hidden lg:block">
+                  <MempoolPanel btcPriceUsd={data.current_price.usd} mempoolData={mempool} loading={lMem} onRefresh={loadM}/>
+                </div>
+                <Alerts currentPriceUsd={data.current_price.usd} currentPriceEur={data.current_price.eur}/>
+                <p className="text-xs text-slate-600 text-center lg:text-left pt-2">
+                  Precios: CoinGecko · Mempool: mempool.space<br/>No es un consejo financiero.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+  </script>
+</body>
+</html>
