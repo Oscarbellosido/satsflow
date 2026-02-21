@@ -238,29 +238,38 @@ async function fetchMempool(){
 
 async function fetchMarket(){
   try{
-    // Fear & Greed: alternative.me (gratuito, sin clave)
+    // Fear & Greed: alternative.me
     const fgR=await fetch('https://api.alternative.me/fng/');
     const fg=await fgR.json();
     const fng=fg.data?.[0];
-    // Dominancia: CoinCap (gratuito, sin clave, CORS abierto)
-    const glR=await fetch('https://api.coincap.io/v2/assets?ids=bitcoin,ethereum&limit=2');
-    const gl=await glR.json();
-    const btcAsset=gl.data?.find(a=>a.id==='bitcoin');
-    const ethAsset=gl.data?.find(a=>a.id==='ethereum');
-    const btcDom=parseFloat(btcAsset?.marketCapUsd||0);
-    const ethDom=parseFloat(ethAsset?.marketCapUsd||0);
-    // Total market cap desde CoinCap global
-    const totR=await fetch('https://api.coincap.io/v2/global');
-    const tot=await totR.json();
-    const totalMcap=parseFloat(tot.data?.totalMarketCapUsd||0);
-    const btcPct=totalMcap>0?(btcDom/totalMcap*100).toFixed(1):'—';
-    const ethPct=totalMcap>0?(ethDom/totalMcap*100).toFixed(1):'—';
-    S.marketData={
-      fearGreed:{value:parseInt(fng?.value||50),label:fng?.value_classification||'Neutral'},
-      dominance:{btc:btcPct,eth:ethPct},
-      totalMcap
-    };
+    S.marketData={fearGreed:{value:parseInt(fng?.value||50),label:fng?.value_classification||'Neutral'},dominance:{btc:'—',eth:'—'},totalMcap:0};
   }catch(e){console.error('fetchMarket',e);}
+  // Dominancia: Binance market cap aproximado via tickers
+  try{
+    const[btcR,ethR,totR]=await Promise.all([
+      fetch('https://api.binance.com/api/v3/ticker/24hr?symbol=BTCUSDT'),
+      fetch('https://api.binance.com/api/v3/ticker/24hr?symbol=ETHUSDT'),
+      fetch('https://api.coingecko.com/api/v3/global')
+    ]);
+    const btc=await btcR.json(),eth=await ethR.json();
+    // Circulante BTC ~19.7M, ETH ~120M
+    const btcMcap=parseFloat(btc.lastPrice)*19700000;
+    const ethMcap=parseFloat(eth.lastPrice)*120000000;
+    let totalMcap=0,btcPct='—',ethPct='—';
+    try{
+      const tot=await totR.json();
+      totalMcap=tot.data?.total_market_cap?.usd||0;
+      btcPct=totalMcap>0?(btcMcap/totalMcap*100).toFixed(1):'—';
+      ethPct=totalMcap>0?(ethMcap/totalMcap*100).toFixed(1):'—';
+    }catch{
+      // Si CoinGecko falla, estimamos
+      const estTotal=btcMcap+ethMcap+btcMcap*0.4;
+      btcPct=(btcMcap/estTotal*100).toFixed(1);
+      ethPct=(ethMcap/estTotal*100).toFixed(1);
+      totalMcap=estTotal;
+    }
+    if(S.marketData)S.marketData={...S.marketData,dominance:{btc:btcPct,eth:ethPct},totalMcap};
+  }catch(e){console.error('fetchMarketDom',e);}
 }
 
 async function fetchMining(){
@@ -281,29 +290,47 @@ async function fetchMining(){
 }
 
 async function fetchNews(){
-  // RSS en español via rss2json (proxy gratuito)
+  // Fuentes RSS en español — probadas una a una con fallback
   const feeds=[
+    // CoinTelegraph España — feed directo
     {url:'https://es.cointelegraph.com/rss',source:'CoinTelegraph ES'},
+    // Criptonoticias Venezuela/Global español
     {url:'https://www.criptonoticias.com/feed/',source:'CriptoNoticias'},
+    // ElMundo Economía como fallback español general
+    {url:'https://feeds.elpais.com/mrss-s/pages/ep/site/elpais.com/section/economia/portada',source:'El País Economía'},
   ];
   const results=[];
   for(const feed of feeds){
+    if(results.length>=8)break;
     try{
-      const r=await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(feed.url)}&count=8`);
+      // Usamos allorigins como proxy CORS para feeds que bloquean
+      const proxyUrl=`https://api.allorigins.win/get?url=${encodeURIComponent(feed.url)}`;
+      const r=await fetch(proxyUrl,{signal:AbortSignal.timeout(6000)});
+      const j=await r.json();
+      const xml=j.contents||'';
+      // Parsear RSS manualmente
+      const items=xml.match(/<item[^>]*>[\s\S]*?<\/item>/g)||[];
+      items.slice(0,6).forEach(item=>{
+        const title=(item.match(/<title><!\[CDATA\[(.*?)\]\]><\/title>/)||item.match(/<title>(.*?)<\/title>/))?.[1]||'Sin título';
+        const link=(item.match(/<link>(.*?)<\/link>/)||item.match(/<guid[^>]*>(https?[^<]+)<\/guid>/))?.[1]||'#';
+        const pubDate=item.match(/<pubDate>(.*?)<\/pubDate>/)?.[1]||new Date().toUTCString();
+        const cleanTitle=title.replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&#\d+;/g,'').trim();
+        if(cleanTitle&&link!=='#'){
+          results.push({id:link,title:cleanTitle,url:link,source:feed.source,date:new Date(pubDate)});
+        }
+      });
+    }catch(e){console.warn('feed',feed.source,e.message);}
+  }
+  // Fallback: CoinTelegraph ES directo via rss2json si allorigins falló
+  if(results.length===0){
+    try{
+      const r=await fetch('https://api.rss2json.com/v1/api.json?rss_url=https%3A%2F%2Fes.cointelegraph.com%2Frss&count=12',{signal:AbortSignal.timeout(8000)});
       const j=await r.json();
       if(j.status==='ok'&&j.items?.length){
-        j.items.slice(0,6).forEach(n=>{
-          results.push({id:n.guid||n.link,title:n.title,url:n.link,source:feed.source,date:new Date(n.pubDate)});
+        j.items.slice(0,10).forEach(n=>{
+          results.push({id:n.guid||n.link,title:n.title,url:n.link,source:'CoinTelegraph ES',date:new Date(n.pubDate)});
         });
       }
-    }catch{}
-  }
-  if(results.length===0){
-    // Último fallback: Coindesk en inglés
-    try{
-      const r=await fetch('https://api.rss2json.com/v1/api.json?rss_url=https://www.coindesk.com/arc/outboundfeeds/rss/&count=10');
-      const j=await r.json();
-      (j.items||[]).slice(0,8).forEach(n=>results.push({id:n.guid,title:n.title,url:n.link,source:'CoinDesk',date:new Date(n.pubDate)}));
     }catch{}
   }
   S.news=results.sort((a,b)=>b.date-a.date).slice(0,12);
