@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="es" class="dark">
+<html lang="es" id="html-root">
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
@@ -7,997 +7,586 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="mobile-web-app-capable" content="yes">
-  <meta name="description" content="Bitcoin tracker completo: precio, análisis técnico, mempool, noticias y alertas">
+  <meta name="description" content="Bitcoin tracker: precio, análisis técnico, mempool, cajeros y alertas">
   <title>SatsFlow</title>
-  <link rel="manifest" href="/manifest.json">
+  <!-- RUTAS RELATIVAS para GitHub Pages subdirectorio -->
+  <link rel="manifest" href="./manifest.json">
   <link rel="icon" type="image/png" href="https://upload.wikimedia.org/wikipedia/commons/thumb/4/46/Bitcoin.svg/64px-Bitcoin.svg.png">
   <link rel="apple-touch-icon" href="https://upload.wikimedia.org/wikipedia/commons/thumb/4/46/Bitcoin.svg/180px-Bitcoin.svg.png">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script>
-    tailwind.config = {
-      darkMode: 'class',
-      theme: { extend: {} }
-    }
-  </script>
   <style>
-    *{transition:background-color 0.2s,border-color 0.2s,color 0.2s}
-    body{font-family:'Inter',sans-serif;
-      padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);
-      padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right);
-      overscroll-behavior-y:none;-webkit-tap-highlight-color:transparent;}
-    ::-webkit-scrollbar{width:4px}
-    ::-webkit-scrollbar-track{background:transparent}
-    ::-webkit-scrollbar-thumb{background:#334155;border-radius:4px}
-    @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
-    .animate-fadeIn{animation:fadeIn 0.35s ease-out}
-    .congestion-bar{transition:width 1.2s ease}
-    input,select,textarea{font-size:16px!important}
-    .candle-up{fill:#10b981;stroke:#10b981}
-    .candle-down{fill:#ef4444;stroke:#ef4444}
-    .wick{stroke-width:1px}
-    /* Leaflet dark fix */
-    .dark .leaflet-tile{filter:brightness(0.7) invert(1) contrast(3) hue-rotate(200deg) saturate(0.3) brightness(0.7)}
-    .dark .leaflet-container{background:#1e293b}
-    .leaflet-container{border-radius:12px;z-index:1}
-    .leaflet-popup-content-wrapper{background:#1e293b;color:#f8fafc;border:1px solid #334155;border-radius:12px}
-    .leaflet-popup-tip{background:#1e293b}
+    :root{--bg:#0f172a;--bg2:#1e293b;--bg3:#334155;--text:#f1f5f9;--text2:#94a3b8;--text3:#64748b;--border:#334155;--card-bg:#1e293b;--input-bg:#0f172a;--input-border:#475569;}
+    .light{--bg:#f8fafc;--bg2:#ffffff;--bg3:#e2e8f0;--text:#0f172a;--text2:#475569;--text3:#94a3b8;--border:#e2e8f0;--card-bg:#ffffff;--input-bg:#f8fafc;--input-border:#cbd5e1;}
+    *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+    body{margin:0;font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);overscroll-behavior-y:none;min-height:100vh}
+    ::-webkit-scrollbar{width:3px}::-webkit-scrollbar-thumb{background:var(--bg3);border-radius:4px}
+    input,select{font-family:'Inter',sans-serif;font-size:15px;color:var(--text);background:var(--input-bg);border:1px solid var(--input-border);border-radius:10px;padding:8px 10px;outline:none;width:100%}
+    input:focus,select:focus{border-color:#f97316}
+    button{cursor:pointer;font-family:'Inter',sans-serif}
+    @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+    .fade{animation:fadeIn .3s ease-out}
+    @keyframes spin2{to{transform:rotate(360deg)}}
+    .spin{animation:spin2 1s linear infinite;display:inline-block}
+    .card{background:var(--card-bg);border:1px solid var(--border);border-radius:18px;padding:18px}
+    #header{position:sticky;top:0;z-index:100;background:var(--bg);border-bottom:1px solid var(--border);padding:10px 16px;display:flex;align-items:center;justify-content:space-between}
+    .logo{width:34px;height:34px;background:#f97316;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;box-shadow:0 0 12px rgba(249,115,22,.3)}
+    #tabbar{position:fixed;bottom:0;left:0;right:0;z-index:100;background:var(--bg2);border-top:1px solid var(--border);display:flex;overflow-x:auto;-webkit-overflow-scrolling:touch}
+    .tab-btn{flex:1;min-width:50px;display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 4px;border:none;background:transparent;color:var(--text3);font-size:9px;font-weight:500;position:relative}
+    .tab-btn.active{color:#f97316}
+    .tab-btn.active::before{content:'';position:absolute;top:0;left:50%;transform:translateX(-50%);width:20px;height:2px;background:#f97316;border-radius:2px}
+    .tab-icon{font-size:18px;line-height:1}
+    #content{padding:14px 14px 90px;max-width:700px;margin:0 auto}
+    .space-y>*+*{margin-top:14px}
+    .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+    .grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+    .stat-box{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:10px;text-align:center}
+    .stat-label{font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em}
+    .stat-val{font-size:14px;font-weight:700;margin-top:2px}
+    .fee-card{background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:8px 4px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:2px}
+    .cong-track{background:var(--bg3);border-radius:999px;height:8px;overflow:hidden}
+    .cong-bar{height:100%;border-radius:999px;transition:width 1.2s ease}
+    .btn-orange{background:#f97316;color:#fff;border:none;border-radius:10px;padding:10px 20px;font-weight:600;font-size:14px}
+    .btn-ghost{background:var(--bg2);color:var(--text2);border:1px solid var(--border);border-radius:10px;padding:6px 10px;font-size:12px}
+    .btn-icon{background:var(--bg2);color:var(--text2);border:1px solid var(--border);border-radius:8px;padding:6px 8px;display:flex;align-items:center;justify-content:center;font-size:15px}
+    .alert-item{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:12px;border:1px solid var(--border);background:var(--bg2);margin-bottom:8px}
+    .alert-item.triggered{background:rgba(234,179,8,.08);border-color:rgba(234,179,8,.4)}
+    .news-item{display:block;padding:10px 12px;border-radius:12px;border:1px solid var(--border);background:var(--bg2);margin-bottom:8px;text-decoration:none;color:var(--text)}
+    .signal-banner{border-radius:14px;padding:14px;border:1px solid;margin-bottom:14px}
+    .signal-buy{background:rgba(16,185,129,.08);border-color:rgba(16,185,129,.3)}
+    .signal-sell{background:rgba(239,68,68,.08);border-color:rgba(239,68,68,.3)}
+    .signal-neutral{background:rgba(234,179,8,.08);border-color:rgba(234,179,8,.3)}
+    .sr-row{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-radius:10px;border:1px solid;margin-bottom:6px}
+    #map-container{height:360px;border-radius:12px;overflow:hidden;margin-top:10px}
+    .prog-track{background:var(--bg3);border-radius:999px;height:6px;overflow:hidden;margin:4px 0}
+    .prog-bar{height:100%;border-radius:999px;transition:width 1s ease}
+    .period-wrap{display:flex;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:3px;gap:2px;overflow-x:auto;margin-bottom:10px}
+    .period-btn{flex:1;min-width:36px;padding:5px 8px;border:none;border-radius:7px;background:transparent;color:var(--text3);font-size:11px;font-weight:500;white-space:nowrap}
+    .period-btn.active{background:var(--bg2);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.2)}
+    .chart-type-wrap{display:flex;gap:4px;margin-bottom:8px}
+    .chart-type-btn{padding:4px 10px;border-radius:7px;border:1px solid var(--border);background:var(--bg2);color:var(--text2);font-size:11px;cursor:pointer}
+    .chart-type-btn.active{background:#f97316;color:#fff;border-color:#f97316}
+    .input-row{display:flex;gap:8px;margin-bottom:12px}
+    .input-row input{flex:1}
+    .input-row select{width:auto;min-width:70px}
+    .notif-banner{background:rgba(249,115,22,.08);border:1px solid rgba(249,115,22,.3);border-radius:12px;padding:10px 12px;display:flex;align-items:flex-start;gap:10px;margin-bottom:12px}
+    .notif-ok{background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.3);border-radius:12px;padding:10px 12px;display:flex;align-items:center;gap:8px;margin-bottom:12px}
+    .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:200;display:flex;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(4px)}
+    .modal-box{background:var(--card-bg);border:1px solid var(--border);border-radius:20px;padding:22px;max-width:360px;width:100%}
+    .modal-step{background:var(--bg3);border-radius:10px;padding:10px 12px;display:flex;gap:10px;align-items:flex-start;margin-bottom:8px}
+    .step-num{width:22px;height:22px;border-radius:50%;background:#f97316;color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+    .mini-chart{width:100%;height:70px}
+    /* Leaflet dark mode */
+    #html-root.dark-mode .leaflet-tile-pane{filter:brightness(.6) invert(1) contrast(3) hue-rotate(200deg) saturate(.3) brightness(.7)}
+    #html-root.dark-mode .leaflet-container{background:#1e293b}
+    .leaflet-container{border-radius:12px}
+    .leaflet-popup-content-wrapper{background:var(--card-bg);color:var(--text);border:1px solid var(--border);border-radius:10px}
+    .leaflet-popup-tip{background:var(--card-bg)}
   </style>
-  <script type="importmap">
-  {"imports":{
-    "lucide-react":"https://aistudiocdn.com/lucide-react@^0.554.0",
-    "react-dom/client":"https://aistudiocdn.com/react-dom@^19.2.0/client",
-    "react-dom":"https://aistudiocdn.com/react-dom@^19.2.0",
-    "react":"https://aistudiocdn.com/react@^19.2.0",
-    "recharts":"https://aistudiocdn.com/recharts@^3.5.0",
-    "react-dom/":"https://aistudiocdn.com/react-dom@^19.2.0/",
-    "react/":"https://aistudiocdn.com/react@^19.2.0/"
-  }}
-  </script>
 </head>
-<body class="dark:bg-slate-950 dark:text-slate-100 bg-gray-50 text-slate-900">
-<div id="root"></div>
+<body>
+<div id="app">
+  <div id="header">
+    <div style="display:flex;align-items:center;gap:10px">
+      <div class="logo">₿</div>
+      <div>
+        <div style="font-size:17px;font-weight:800;line-height:1.1">SatsFlow</div>
+        <div style="font-size:10px;color:var(--text3)">Bitcoin Tracker</div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <div style="text-align:right">
+        <div id="header-price" style="font-size:17px;font-weight:800;font-family:monospace">$—</div>
+        <div id="header-change" style="font-size:11px;font-weight:600"></div>
+      </div>
+      <button class="btn-icon" id="theme-btn" title="Cambiar tema" onclick="toggleTheme()">🌙</button>
+      <button class="btn-icon" id="install-btn" style="display:none" onclick="handleInstall()">⬇️</button>
+    </div>
+  </div>
+  <div id="content">
+    <div id="tab-home" class="tab-content fade"></div>
+    <div id="tab-analysis" class="tab-content fade" style="display:none"></div>
+    <div id="tab-market" class="tab-content fade" style="display:none"></div>
+    <div id="tab-mempool" class="tab-content fade" style="display:none"></div>
+    <div id="tab-atm" class="tab-content fade" style="display:none"></div>
+    <div id="tab-news" class="tab-content fade" style="display:none"></div>
+    <div id="tab-alerts" class="tab-content fade" style="display:none"></div>
+  </div>
+  <nav id="tabbar">
+    <button class="tab-btn active" data-tab="home" onclick="switchTab('home')"><span class="tab-icon">🏠</span>Inicio</button>
+    <button class="tab-btn" data-tab="analysis" onclick="switchTab('analysis')"><span class="tab-icon">🧠</span>Análisis</button>
+    <button class="tab-btn" data-tab="market" onclick="switchTab('market')"><span class="tab-icon">📊</span>Mercado</button>
+    <button class="tab-btn" data-tab="mempool" onclick="switchTab('mempool')"><span class="tab-icon">⛓️</span>Mempool</button>
+    <button class="tab-btn" data-tab="atm" onclick="switchTab('atm')"><span class="tab-icon">🏧</span>Cajeros</button>
+    <button class="tab-btn" data-tab="news" onclick="switchTab('news')"><span class="tab-icon">📰</span>Noticias</button>
+    <button class="tab-btn" data-tab="alerts" onclick="switchTab('alerts')"><span class="tab-icon">🔔</span>Alertas</button>
+  </nav>
+</div>
 
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-  function openDB(){
-    return new Promise((res,rej)=>{
-      const r=indexedDB.open('satsflow',1);
-      r.onupgradeneeded=e=>{const db=e.target.result;
-        if(!db.objectStoreNames.contains('alerts'))db.createObjectStore('alerts',{keyPath:'id'});
-        if(!db.objectStoreNames.contains('meta'))db.createObjectStore('meta',{keyPath:'key'});};
-      r.onsuccess=e=>res(e.target.result);r.onerror=e=>rej(e.target.error);
-    });
-  }
-  window.dbHelpers={
-    async saveAlerts(a){try{const db=await openDB();const tx=db.transaction('alerts','readwrite');const s=tx.objectStore('alerts');s.clear();for(const x of a)s.put(x);return new Promise((r,j)=>{tx.oncomplete=r;tx.onerror=j;});}catch(e){console.warn(e);}},
-    async loadAlerts(){try{const db=await openDB();const tx=db.transaction('alerts','readonly');return new Promise(r=>{const q=tx.objectStore('alerts').getAll();q.onsuccess=()=>r(q.result||[]);q.onerror=()=>r([]);});}catch{return[];}}
-  };
-  if('serviceWorker' in navigator){
-    window.addEventListener('load',async()=>{
-      try{
-        const reg=await navigator.serviceWorker.register('/sw.js');
-        if('periodicSync' in reg){try{const p=await navigator.permissions.query({name:'periodic-background-sync'});if(p.state==='granted')await reg.periodicSync.register('price-check',{minInterval:15*60*1000});}catch{}}
-      }catch(e){console.warn('[PWA]',e.message);}
-    });
-  }
-</script>
+/* ══════ STATE ══════ */
+const S={price:{usd:0,eur:0},change24h:0,marketCap:0,history:[],ohlc:[],mempool:null,marketData:null,miningData:null,news:[],alerts:[],days:'30',chartType:'area',dark:localStorage.getItem('sf-theme')!=='light',notifPerm:window.Notification?.permission||'unsupported',atmLoaded:false,leafletMap:null,lastUpdated:null,feeLevel:'hour',txSize:250,currentTab:'home'};
 
-<script type="text/babel" data-type="module">
-import React,{useState,useEffect,useCallback,useRef,useMemo}from'react';
-import ReactDOM from'react-dom/client';
-import{RefreshCw,ArrowRightLeft,TrendingUp,Bell,BellPlus,Trash2,AlertTriangle,
-  Bitcoin,Download,X,Zap,Activity,Info,ChevronUp,ChevronDown,CheckCircle,
-  Newspaper,BarChart2,Cpu,Globe,ExternalLink,Home,Sun,Moon,MapPin,Navigation,
-  TrendingDown,Minus,Brain}from'lucide-react';
-import{AreaChart,Area,XAxis,YAxis,CartesianGrid,Tooltip,ResponsiveContainer,
-  LineChart,Line,ReferenceLine}from'recharts';
+/* ══════ THEME ══════ */
+function applyTheme(){
+  if(S.dark){document.documentElement.classList.remove('light');document.getElementById('html-root').classList.add('dark-mode');document.getElementById('theme-btn').textContent='☀️';}
+  else{document.documentElement.classList.add('light');document.getElementById('html-root').classList.remove('dark-mode');document.getElementById('theme-btn').textContent='🌙';}
+  document.body.style.background=S.dark?'#0f172a':'#f8fafc';
+  document.body.style.color=S.dark?'#f1f5f9':'#0f172a';
+}
+function toggleTheme(){S.dark=!S.dark;localStorage.setItem('sf-theme',S.dark?'dark':'light');applyTheme();renderCurrentTab();}
+applyTheme();
 
-/* ══════════════════════════════════════════════════════════
-   THEME CONTEXT
-══════════════════════════════════════════════════════════ */
-const ThemeCtx=React.createContext({dark:true,toggle:()=>{}});
-const useTheme=()=>React.useContext(ThemeCtx);
+/* ══════ TABS ══════ */
+function switchTab(tab){
+  S.currentTab=tab;
+  document.querySelectorAll('.tab-content').forEach(el=>el.style.display='none');
+  document.querySelectorAll('.tab-btn').forEach(el=>el.classList.toggle('active',el.dataset.tab===tab));
+  const el=document.getElementById('tab-'+tab);
+  el.style.display='block';
+  el.classList.remove('fade');void el.offsetWidth;el.classList.add('fade');
+  renderTab(tab);
+  if(tab==='atm'&&S.leafletMap)setTimeout(()=>S.leafletMap.invalidateSize(),150);
+}
+function renderCurrentTab(){renderTab(S.currentTab);}
 
-/* ══════════════════════════════════════════════════════════
-   APIS
-══════════════════════════════════════════════════════════ */
-const GKO='https://api.coingecko.com/api/v3';
-const MEM='https://mempool.space/api';
+/* ══════ UTILS ══════ */
+const fmtN=(v,d=2)=>isNaN(v)?'—':Number(v).toLocaleString('en-US',{maximumFractionDigits:d});
+const fmtBig=v=>{if(!v)return'—';if(v>=1e12)return`$${(v/1e12).toFixed(2)}T`;if(v>=1e9)return`$${(v/1e9).toFixed(1)}B`;return`$${v.toLocaleString()}`;};
+const timeAgo=d=>{const s=Math.floor((Date.now()-d)/1000);if(s<60)return s+'s';if(s<3600)return Math.floor(s/60)+'m';if(s<86400)return Math.floor(s/3600)+'h';return Math.floor(s/86400)+'d';};
 
-const fetchBitcoinData=async(days='30')=>{
+/* ══════ INDEXEDDB ══════ */
+function openDB(){return new Promise((res,rej)=>{const r=indexedDB.open('satsflow',1);r.onupgradeneeded=e=>{if(!e.target.result.objectStoreNames.contains('alerts'))e.target.result.createObjectStore('alerts',{keyPath:'id'});};r.onsuccess=e=>res(e.target.result);r.onerror=rej;});}
+async function saveAlerts(){try{const db=await openDB();const tx=db.transaction('alerts','readwrite');const s=tx.objectStore('alerts');s.clear();S.alerts.forEach(a=>s.put(a));}catch{}}
+async function loadAlertsDB(){try{const db=await openDB();const tx=db.transaction('alerts','readonly');return new Promise(res=>{const q=tx.objectStore('alerts').getAll();q.onsuccess=()=>res(q.result||[]);q.onerror=()=>res([]);});}catch{return[];}}
+
+/* ══════ SERVICE WORKER — ruta relativa ══════ */
+if('serviceWorker' in navigator){
+  window.addEventListener('load',async()=>{
+    try{
+      // Usar ruta relativa para que funcione en subdirectorio de GitHub Pages
+      const swUrl=new URL('./sw.js',window.location.href).href;
+      const reg=await navigator.serviceWorker.register(swUrl,{scope:'./'});
+      console.log('[SW] registrado:',reg.scope);
+      if('periodicSync' in reg){try{const p=await navigator.permissions.query({name:'periodic-background-sync'});if(p.state==='granted')await reg.periodicSync.register('price-check',{minInterval:15*60*1000});}catch{}}
+    }catch(e){console.warn('[SW]',e.message);}
+  });
+}
+
+/* ══════ INSTALL ══════ */
+let deferredPrompt=null;
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredPrompt=e;document.getElementById('install-btn').style.display='flex';});
+async function handleInstall(){if(deferredPrompt){deferredPrompt.prompt();await deferredPrompt.userChoice;deferredPrompt=null;document.getElementById('install-btn').style.display='none';}else showInstallModal();}
+function showInstallModal(){
+  const o=document.createElement('div');o.className='modal-overlay';
+  o.innerHTML=`<div class="modal-box"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px"><div style="font-size:16px;font-weight:700">⬇️ Instalar SatsFlow</div><button onclick="this.closest('.modal-overlay').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text2)">✕</button></div><div class="modal-step"><div class="step-num">1</div><div style="font-size:13px;color:var(--text2)">Pulsa el menú del navegador (⋮ o compartir).</div></div><div class="modal-step"><div class="step-num">2</div><div style="font-size:13px;color:var(--text2)">Selecciona <b>"Instalar aplicación"</b> o <b>"Añadir a pantalla de inicio"</b>.</div></div><div class="modal-step"><div class="step-num">3</div><div style="font-size:13px;color:var(--text2)">Funciona con notificaciones aunque esté cerrada.</div></div><button class="btn-orange" style="width:100%;margin-top:14px" onclick="this.closest('.modal-overlay').remove()">Entendido</button></div>`;
+  document.body.appendChild(o);
+}
+
+/* ══════ NOTIFICATIONS ══════ */
+async function requestNotifPerm(){if(!window.Notification)return'unsupported';const r=await Notification.requestPermission();S.notifPerm=r;return r;}
+function showNotif(title,body){if(Notification.permission!=='granted')return;const opts={body,icon:'https://upload.wikimedia.org/wikipedia/commons/thumb/4/46/Bitcoin.svg/192px-Bitcoin.svg.png',vibrate:[300,100,300],tag:'sf-alert',renotify:true};if('serviceWorker' in navigator)navigator.serviceWorker.ready.then(r=>r.showNotification(title,opts));else new Notification(title,opts);}
+
+/* ══════ APIS ══════ */
+const GKO='https://api.coingecko.com/api/v3',MEM='https://mempool.space/api';
+async function fetchPrice(){
   try{
-    const[pr,hr]=await Promise.all([
-      fetch(`${GKO}/simple/price?ids=bitcoin&vs_currencies=usd,eur&include_24hr_change=true&include_market_cap=true`),
-      fetch(`${GKO}/coins/bitcoin/market_chart?vs_currency=usd&days=${days}`)
-    ]);
+    const[pr,hr]=await Promise.all([fetch(`${GKO}/simple/price?ids=bitcoin&vs_currencies=usd,eur&include_24hr_change=true&include_market_cap=true`),fetch(`${GKO}/coins/bitcoin/market_chart?vs_currency=usd&days=${S.days}`)]);
     const pj=await pr.json(),hj=await hr.json();
-    const history=hj.prices.map(([ts,price])=>{
-      const d=new Date(ts);
-      const label=days==='1'?d.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'}):
-        days==='7'||days==='30'?d.toLocaleDateString('es-ES',{month:'numeric',day:'numeric'}):
-        d.toLocaleDateString('es-ES',{month:'short',year:'2-digit'});
-      return{date:label,fullDate:d.toLocaleString(),price};
-    });
-    return{current_price:{usd:pj.bitcoin.usd,eur:pj.bitcoin.eur},
-      change24h:pj.bitcoin.usd_24h_change||0,marketCap:pj.bitcoin.usd_market_cap||0,history};
-  }catch{return{current_price:{usd:0,eur:0},change24h:0,marketCap:0,history:[]};}
-};
-
-const fetchOHLC=async(days='7')=>{
-  try{
-    const r=await fetch(`${GKO}/coins/bitcoin/ohlc?vs_currency=usd&days=${days}`);
-    const j=await r.json();
-    return j.map(([ts,o,h,l,c])=>({ts,date:new Date(ts).toLocaleDateString('es-ES',{month:'numeric',day:'numeric'}),fullDate:new Date(ts).toLocaleString(),open:o,high:h,low:l,close:c}));
-  }catch{return[];}
-};
-
-const fetchMempoolData=async()=>{
-  try{
-    const[fr,sr,br]=await Promise.all([fetch(`${MEM}/v1/fees/recommended`),fetch(`${MEM}/mempool`),fetch(`${MEM}/v1/blocks`)]);
-    const fees=await fr.json(),stats=await sr.json(),blocks=await br.json();
-    const txCount=stats.count||0,last=blocks[0]||{},height=last.height||0,next=Math.ceil(height/210000)*210000;
-    return{fees:{fastest:fees.fastestFee||0,halfHour:fees.halfHourFee||0,hour:fees.hourFee||0,economy:fees.economyFee||0,minimum:fees.minimumFee||1},
-      mempool:{txCount,vsize:Math.round((stats.vsize||0)/1e6),congestion:Math.min(100,Math.round((txCount/150000)*100))},
-      network:{height,nextHalving:next,blocksToHalving:next-height}};
-  }catch{return null;}
-};
-
-const fetchMarketData=async()=>{
-  try{
-    const[fgRes,glRes]=await Promise.all([fetch('https://api.alternative.me/fng/'),fetch(`${GKO}/global`)]);
-    const fg=await fgRes.json(),gl=await glRes.json();
-    const fng=fg.data?.[0];
-    return{fearGreed:{value:parseInt(fng?.value||50),label:fng?.value_classification||'Neutral'},
-      dominance:{btc:(gl.data?.market_cap_percentage?.btc||0).toFixed(1),eth:(gl.data?.market_cap_percentage?.eth||0).toFixed(1)},
-      totalMarketCap:gl.data?.total_market_cap?.usd||0};
-  }catch{return null;}
-};
-
-const fetchMiningData=async()=>{
-  try{
-    const[hrRes,adjRes]=await Promise.all([fetch('https://blockchain.info/q/hashrate'),fetch(`${MEM}/v1/difficulty-adjustment`)]);
-    const hashrate=await hrRes.json(),adj=await adjRes.json();
-    return{hashrate:(hashrate/1e9).toFixed(2),progressPercent:adj.progressPercent||0,
-      estimatedRetargetDate:adj.estimatedRetargetDate||null,remainingBlocks:adj.remainingBlocks||0,difficultyChange:adj.difficultyChange||0};
-  }catch{return null;}
-};
-
-const fetchNews=async()=>{
-  try{
-    const r=await fetch('https://api.rss2json.com/v1/api.json?rss_url=https://feeds.feedburner.com/CoinDesk&count=15');
-    const j=await r.json();
-    return(j.items||[]).slice(0,12).map(n=>({id:n.guid,title:n.title,url:n.link,source:'CoinDesk',publishedAt:new Date(n.pubDate)}));
-  }catch{return[];}
-};
-
-const fetchATMs=async(lat,lng)=>{
-  try{
-    const delta=0.5;
-    const r=await fetch(`https://api.btcmap.org/v2/elements?lat=${lat-delta}&lon=${lng-delta}&lat2=${lat+delta}&lon2=${lng+delta}`);
-    const j=await r.json();
-    return(j||[]).filter(e=>e.osm_json?.tags?.['amenity']==='atm'||e.osm_json?.tags?.['bitcoin']||e.osm_json?.tags?.['payment:bitcoin']==='yes').slice(0,30).map(e=>({
-      id:e.id,lat:e.osm_json?.lat||e.osm_json?.center?.lat,lng:e.osm_json?.lon||e.osm_json?.center?.lon,
-      name:e.osm_json?.tags?.name||'Bitcoin ATM',operator:e.osm_json?.tags?.operator||'',
-      type:e.osm_json?.tags?.['amenity']==='atm'?'ATM':'Comercio',
-      address:e.osm_json?.tags?.['addr:street']||''
-    })).filter(e=>e.lat&&e.lng);
-  }catch{return[];}
-};
-
-/* ══════════════════════════════════════════════════════════
-   TECHNICAL ANALYSIS ENGINE
-══════════════════════════════════════════════════════════ */
-const calcSMA=(prices,period)=>{
-  return prices.map((_,i)=>{
-    if(i<period-1)return null;
-    const slice=prices.slice(i-period+1,i+1);
-    return slice.reduce((a,b)=>a+b,0)/period;
-  });
-};
-
-const calcEMA=(prices,period)=>{
-  const k=2/(period+1);
-  const ema=[];
-  prices.forEach((p,i)=>{
-    if(i===0){ema.push(p);return;}
-    ema.push(p*k+ema[i-1]*(1-k));
-  });
-  return ema;
-};
-
-const calcRSI=(prices,period=14)=>{
-  const rsi=new Array(period).fill(null);
-  let gains=0,losses=0;
-  for(let i=1;i<=period;i++){
-    const diff=prices[i]-prices[i-1];
-    if(diff>0)gains+=diff;else losses+=Math.abs(diff);
+    S.price={usd:pj.bitcoin.usd,eur:pj.bitcoin.eur};
+    S.change24h=pj.bitcoin.usd_24h_change||0;
+    S.marketCap=pj.bitcoin.usd_market_cap||0;
+    S.history=hj.prices.map(([ts,price])=>{const d=new Date(ts);const label=S.days==='1'?d.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'}):S.days==='7'||S.days==='30'?d.toLocaleDateString('es-ES',{month:'numeric',day:'numeric'}):d.toLocaleDateString('es-ES',{month:'short',year:'2-digit'});return{date:label,price};});
+    S.lastUpdated=new Date();
+    updateHeader();
+  }catch(e){console.error('fetchPrice',e);}
+}
+async function fetchOHLC(){try{const r=await fetch(`${GKO}/coins/bitcoin/ohlc?vs_currency=usd&days=${S.days}`);const j=await r.json();S.ohlc=j.map(([ts,o,h,l,c])=>({ts,date:new Date(ts).toLocaleDateString('es-ES',{month:'numeric',day:'numeric'}),open:o,high:h,low:l,close:c}));}catch{}}
+async function fetchMempool(){try{const[fr,sr,br]=await Promise.all([fetch(`${MEM}/v1/fees/recommended`),fetch(`${MEM}/mempool`),fetch(`${MEM}/v1/blocks`)]);const fees=await fr.json(),stats=await sr.json(),blocks=await br.json();const txCount=stats.count||0,last=blocks[0]||{},height=last.height||0,next=Math.ceil(height/210000)*210000;S.mempool={fees:{fastest:fees.fastestFee||0,halfHour:fees.halfHourFee||0,hour:fees.hourFee||0,economy:fees.economyFee||0,minimum:fees.minimumFee||1},mempool:{txCount,vsize:Math.round((stats.vsize||0)/1e6),congestion:Math.min(100,Math.round((txCount/150000)*100))},network:{height,nextHalving:next,blocksToHalving:next-height}};}catch{}}
+async function fetchMarket(){try{const[fgR,glR]=await Promise.all([fetch('https://api.alternative.me/fng/'),fetch(`${GKO}/global`)]);const fg=await fgR.json(),gl=await glR.json();const fng=fg.data?.[0];S.marketData={fearGreed:{value:parseInt(fng?.value||50),label:fng?.value_classification||'Neutral'},dominance:{btc:(gl.data?.market_cap_percentage?.btc||0).toFixed(1),eth:(gl.data?.market_cap_percentage?.eth||0).toFixed(1)},totalMcap:gl.data?.total_market_cap?.usd||0};}catch{}}
+async function fetchMining(){try{const[hrR,adjR]=await Promise.all([fetch('https://blockchain.info/q/hashrate'),fetch(`${MEM}/v1/difficulty-adjustment`)]);const hashrate=await hrR.json(),adj=await adjR.json();S.miningData={hashrate:(hashrate/1e9).toFixed(2),progressPercent:adj.progressPercent||0,remainingBlocks:adj.remainingBlocks||0,difficultyChange:adj.difficultyChange||0};}catch{}}
+async function fetchNews(){
+  const feeds=[
+    {url:'https://www.criptonoticias.com/feed/',source:'CriptoNoticias'},
+    {url:'https://es.cointelegraph.com/rss',source:'CoinTelegraph ES'},
+    {url:'https://www.eleconomista.es/rss/rss-seleccion-ee.php',source:'El Economista'},
+  ];
+  const results=[];
+  for(const feed of feeds){
+    try{
+      const r=await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(feed.url)}&count=6`);
+      const j=await r.json();
+      if(j.items?.length){
+        (j.items||[]).slice(0,5).forEach(n=>{
+          const title=(n.title||'').toLowerCase();
+          if(title.includes('bitcoin')||title.includes('btc')||title.includes('crypto')||title.includes('cripto')||feed.source==='CriptoNoticias'||feed.source==='CoinTelegraph ES'){
+            results.push({id:n.guid||n.link,title:n.title,url:n.link,source:feed.source,date:new Date(n.pubDate)});
+          }
+        });
+      }
+    }catch{}
   }
-  let avgGain=gains/period,avgLoss=losses/period;
-  for(let i=period;i<prices.length;i++){
-    const diff=prices[i]-prices[i-1];
-    avgGain=(avgGain*(period-1)+(diff>0?diff:0))/period;
-    avgLoss=(avgLoss*(period-1)+(diff<0?Math.abs(diff):0))/period;
-    const rs=avgLoss===0?100:avgGain/avgLoss;
-    rsi.push(100-(100/(1+rs)));
+  // Fallback si no hay nada
+  if(!results.length){
+    try{
+      const r=await fetch('https://api.rss2json.com/v1/api.json?rss_url=https://es.cointelegraph.com/rss&count=12');
+      const j=await r.json();
+      (j.items||[]).slice(0,10).forEach(n=>results.push({id:n.guid,title:n.title,url:n.link,source:'CoinTelegraph ES',date:new Date(n.pubDate)}));
+    }catch{}
   }
-  return rsi;
-};
+  S.news=results.sort((a,b)=>b.date-a.date).slice(0,12);
+}}
 
-const calcMACD=(prices)=>{
-  const ema12=calcEMA(prices,12);
-  const ema26=calcEMA(prices,26);
-  const macdLine=ema12.map((v,i)=>v-ema26[i]);
-  const signal=calcEMA(macdLine.slice(26),9);
-  const paddedSignal=new Array(26).fill(null).concat(new Array(macdLine.length-26-signal.length).fill(null)).concat(signal);
-  const histogram=macdLine.map((v,i)=>paddedSignal[i]!=null?v-paddedSignal[i]:null);
-  return{macdLine,signal:paddedSignal,histogram};
-};
-
-const calcBollingerBands=(prices,period=20,multiplier=2)=>{
-  const sma=calcSMA(prices,period);
-  return prices.map((_,i)=>{
-    if(sma[i]===null)return{upper:null,middle:null,lower:null};
-    const slice=prices.slice(Math.max(0,i-period+1),i+1);
-    const mean=sma[i];
-    const std=Math.sqrt(slice.reduce((a,b)=>a+(b-mean)**2,0)/slice.length);
-    return{upper:mean+multiplier*std,middle:mean,lower:mean-multiplier*std};
-  });
-};
-
-const analyzeMarket=(prices)=>{
+/* ══════ TECHNICAL ANALYSIS ══════ */
+function calcEMA(p,k){const m=2/(k+1),e=[];p.forEach((v,i)=>{e.push(i===0?v:v*m+e[i-1]*(1-m));});return e;}
+function calcRSI(p,k=14){const r=new Array(k).fill(null);let g=0,l=0;for(let i=1;i<=k;i++){const d=p[i]-p[i-1];d>0?g+=d:l+=Math.abs(d);}let ag=g/k,al=l/k;for(let i=k;i<p.length;i++){const d=p[i]-p[i-1];ag=(ag*(k-1)+(d>0?d:0))/k;al=(al*(k-1)+(d<0?Math.abs(d):0))/k;r.push(100-(100/(1+(al===0?100:ag/al))));}return r;}
+function analyze(){
+  const prices=S.history.map(h=>h.price);
   if(prices.length<30)return null;
   const last=prices[prices.length-1];
-  const rsi=calcRSI(prices);
-  const lastRSI=rsi[rsi.length-1];
-  const sma7=calcSMA(prices,7);
-  const sma30=calcSMA(prices,Math.min(30,prices.length));
-  const lastSMA7=sma7[sma7.length-1];
-  const lastSMA30=sma30[sma30.length-1];
-  const{macdLine,signal,histogram}=calcMACD(prices);
-  const lastMACD=macdLine[macdLine.length-1];
-  const lastSignal=signal[signal.length-1];
-  const lastHist=histogram[histogram.length-1];
-  const bb=calcBollingerBands(prices);
-  const lastBB=bb[bb.length-1];
-
-  // Support & Resistance (simplified: recent highs/lows)
+  const rsiArr=calcRSI(prices),lastRSI=rsiArr[rsiArr.length-1];
+  const e12=calcEMA(prices,12),e26=calcEMA(prices,26);
+  const macd=e12.map((v,i)=>v-e26[i]);
+  const sig=calcEMA(macd.slice(26),9);
+  const padSig=[...new Array(26).fill(null),...new Array(macd.length-26-sig.length).fill(null),...sig];
+  const lMACD=macd[macd.length-1],lSig=padSig[padSig.length-1];
+  const sma7=prices.slice(-7).reduce((a,b)=>a+b,0)/7;
+  const sma30=prices.slice(-30).reduce((a,b)=>a+b,0)/30;
+  const sl20=prices.slice(-20),m20=sl20.reduce((a,b)=>a+b,0)/20;
+  const std=Math.sqrt(sl20.reduce((a,b)=>a+(b-m20)**2,0)/sl20.length);
+  const bbU=m20+2*std,bbL=m20-2*std;
   const recent=prices.slice(-30);
-  const support=Math.min(...recent)*0.98;
-  const resistance=Math.max(...recent)*1.02;
+  const support=Math.min(...recent)*0.98,resistance=Math.max(...recent)*1.02;
+  let bull=0,bear=0;
+  if(lastRSI<30)bull+=3;else if(lastRSI<45)bull+=1;else if(lastRSI>70)bear+=3;else if(lastRSI>55)bear+=1;
+  if(sma7>sma30)bull+=2;else bear+=2;
+  if(lMACD>lSig)bull+=2;else bear+=2;
+  if(last<bbL)bull+=2;else if(last>bbU)bear+=2;
+  const total=bull+bear,bullPct=total>0?Math.round((bull/total)*100):50;
+  const signal=bullPct>=65?'COMPRAR':bullPct<=35?'VENDER':'NEUTRAL';
+  return{lastRSI,sma7,sma30,lMACD,lSig,bbU,bbL,support,resistance,bullPct,bearPct:100-bullPct,signal,last,rsiData:rsiArr.slice(-40).filter(v=>v!=null),macdData:macd.slice(-40),sigData:padSig.slice(-40)};
+}
 
-  // Score system
-  let bullScore=0,bearScore=0;
-  if(lastRSI<30){bullScore+=3;}else if(lastRSI<45){bullScore+=1;}
-  else if(lastRSI>70){bearScore+=3;}else if(lastRSI>55){bearScore+=1;}
-  if(lastSMA7>lastSMA30)bullScore+=2;else bearScore+=2;
-  if(lastMACD>lastSignal)bullScore+=2;else bearScore+=2;
-  if(lastHist>0&&lastHist>histogram[histogram.length-2])bullScore+=1;
-  else if(lastHist<0&&lastHist<histogram[histogram.length-2])bearScore+=1;
-  if(lastBB.lower&&last<lastBB.lower)bullScore+=2;
-  else if(lastBB.upper&&last>lastBB.upper)bearScore+=2;
+/* ══════ SVG CHARTS ══════ */
+function miniLine(data,color,h=65,refs=[]){
+  const v=data.filter(x=>x!=null);if(!v.length)return'';
+  const min=Math.min(...v),max=Math.max(...v),range=max-min||1;
+  const W=300,H=h,P=4;
+  const pts=data.map((x,i)=>{if(x==null)return null;return`${P+(i/(data.length-1))*(W-P*2)},${P+(1-(x-min)/range)*(H-P*2)}`;}).filter(Boolean).join(' ');
+  const rls=refs.map(({val,color:rc})=>{const y=P+(1-(val-min)/range)*(H-P*2);return`<line x1="${P}" y1="${y}" x2="${W-P}" y2="${y}" stroke="${rc}" stroke-dasharray="4 3" stroke-width="1" opacity=".7"/>`;}).join('');
+  return`<svg viewBox="0 0 ${W} ${H}" class="mini-chart" preserveAspectRatio="none">${rls}<polyline points="${pts}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round"/></svg>`;
+}
+function areaSVG(data){
+  if(!data.length)return'';
+  const prices=data.map(d=>d.price),min=Math.min(...prices),max=Math.max(...prices),range=max-min||1;
+  const W=300,H=100,P=4,last=prices[prices.length-1],first=prices[0],color=last>=first?'#10b981':'#ef4444';
+  const pts=data.map((d,i)=>`${P+(i/(data.length-1))*(W-P*2)},${P+(1-(d.price-min)/range)*(H-P*2)}`);
+  return`<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:120px" preserveAspectRatio="none"><defs><linearGradient id="ag" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${color}" stop-opacity=".3"/><stop offset="100%" stop-color="${color}" stop-opacity="0"/></linearGradient></defs><polygon points="${P},${H} ${pts.join(' ')} ${W-P},${H}" fill="url(#ag)"/><polyline points="${pts.join(' ')}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round"/></svg>`;
+}
+function candleSVG(data){
+  if(!data.length)return'';
+  const ps=data.flatMap(d=>[d.high,d.low]),min=Math.min(...ps),max=Math.max(...ps),range=max-min||1;
+  const W=300,H=120,P=4,cW=Math.max(2,Math.floor((W-P*2)/data.length)-2);
+  const toY=v=>P+(1-(v-min)/range)*(H-P*2),toX=i=>P+(i+.5)*((W-P*2)/data.length);
+  const c=data.map((d,i)=>{const up=d.close>=d.open,x=toX(i),col=up?'#10b981':'#ef4444';const yH=toY(d.high),yL=toY(d.low),yO=toY(d.open),yC=toY(d.close),bT=Math.min(yO,yC),bH=Math.max(1,Math.abs(yO-yC));return`<line x1="${x}" y1="${yH}" x2="${x}" y2="${yL}" stroke="${col}" stroke-width="1"/><rect x="${x-cW/2}" y="${bT}" width="${cW}" height="${bH}" fill="${col}" rx="1"/>`;}).join('');
+  return`<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:120px" preserveAspectRatio="none">${c}</svg>`;
+}
 
-  const total=bullScore+bearScore;
-  const bullPct=total>0?Math.round((bullScore/total)*100):50;
+/* ══════ HEADER ══════ */
+function updateHeader(){
+  const p=document.getElementById('header-price'),c=document.getElementById('header-change');
+  if(p)p.textContent='$'+S.price.usd.toLocaleString();
+  if(c){const pos=S.change24h>=0;c.textContent=(pos?'▲ +':'▼ ')+Math.abs(S.change24h).toFixed(2)+'%';c.style.color=pos?'#10b981':'#ef4444';}
+}
 
-  let signal2,signalColor,signalIcon;
-  if(bullPct>=65){signal2='COMPRAR';signalColor='emerald';signalIcon='↑';}
-  else if(bullPct<=35){signal2='VENDER';signalColor='red';signalIcon='↓';}
-  else{signal2='NEUTRAL';signalColor='yellow';signalIcon='→';}
+/* ══════ RENDER TABS ══════ */
+function renderTab(tab){
+  const el=document.getElementById('tab-'+tab);if(!el)return;
+  const map={home:renderHome,analysis:renderAnalysis,market:renderMarket,mempool:renderMempool,atm:renderATM,news:renderNews,alerts:renderAlerts};
+  if(map[tab])el.innerHTML=map[tab]();
+  if(tab==='atm'&&!S.atmLoaded)initATM();
+}
 
-  return{
-    rsi:lastRSI?.toFixed(1),sma7:lastSMA7,sma30:lastSMA30,
-    macd:lastMACD?.toFixed(1),macdSignal:lastSignal?.toFixed(1),
-    bbUpper:lastBB.upper,bbLower:lastBB.lower,bbMiddle:lastBB.middle,
-    support,resistance,bullPct,bearPct:100-bullPct,
-    signal:signal2,signalColor,signalIcon,
-    rsiData:rsi.slice(-50).map((v,i)=>({i,rsi:v})),
-    macdData:macdLine.slice(-50).map((v,i)=>({i,macd:v,signal:signal[signal.length-50+i],hist:histogram[histogram.length-50+i]})),
-  };
-};
-
-/* ══════════════════════════════════════════════════════════
-   HELPERS
-══════════════════════════════════════════════════════════ */
-const showNotif=(title,body)=>{
-  if(Notification.permission!=='granted')return;
-  const opts={body,icon:'https://upload.wikimedia.org/wikipedia/commons/thumb/4/46/Bitcoin.svg/192px-Bitcoin.svg.png',vibrate:[300,100,300],tag:'satsflow-alert',renotify:true};
-  if('serviceWorker' in navigator)navigator.serviceWorker.ready.then(reg=>reg.showNotification(title,opts));
-  else new Notification(title,opts);
-};
-const fmtNum=(v,d=2)=>isNaN(v)?'—':Number(v).toLocaleString('en-US',{maximumFractionDigits:d});
-const fmtBig=(v)=>{if(!v||isNaN(v))return'—';if(v>=1e12)return`$${(v/1e12).toFixed(2)}T`;if(v>=1e9)return`$${(v/1e9).toFixed(1)}B`;return`$${v.toLocaleString()}`;};
-const timeAgo=(date)=>{const s=Math.floor((Date.now()-date.getTime())/1000);if(s<60)return`${s}s`;if(s<3600)return`${Math.floor(s/60)}m`;if(s<86400)return`${Math.floor(s/3600)}h`;return`${Math.floor(s/86400)}d`;};
-
-/* ══════════════════════════════════════════════════════════
-   CARD COMPONENT (theme-aware)
-══════════════════════════════════════════════════════════ */
-const Card=({children,className=''})=>{
-  const{dark}=useTheme();
-  return<div className={`${dark?'bg-slate-800 border-slate-700':'bg-white border-gray-200 shadow-sm'} rounded-2xl border p-5 ${className}`}>{children}</div>;
-};
-
-/* ══════════════════════════════════════════════════════════
-   INSTALL PROMPT
-══════════════════════════════════════════════════════════ */
-const InstallPrompt=()=>{
-  const{dark}=useTheme();
-  const[prompt,setPrompt]=useState(null);
-  const[modal,setModal]=useState(false);
-  const[installed,setInstalled]=useState(false);
-  useEffect(()=>{
-    if(window.matchMedia('(display-mode: standalone)').matches||window.navigator.standalone){setInstalled(true);return;}
-    const h=e=>{e.preventDefault();setPrompt(e);};
-    window.addEventListener('beforeinstallprompt',h);
-    return()=>window.removeEventListener('beforeinstallprompt',h);
-  },[]);
-  if(installed)return null;
-  const handle=async()=>{if(prompt){prompt.prompt();await prompt.userChoice;setPrompt(null);}else setModal(true);};
-  return(<>
-    <button onClick={handle} className={`p-2 rounded-lg border text-sm font-medium flex items-center gap-1.5 transition-colors ${dark?'bg-slate-800 border-slate-700 text-slate-300 hover:text-white hover:bg-slate-700':'bg-gray-100 border-gray-200 text-gray-600 hover:bg-gray-200'}`}>
-      <Download className="w-4 h-4"/><span className="hidden sm:inline">Instalar</span>
-    </button>
-    {modal&&(<div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
-      <div className={`${dark?'bg-slate-900 border-slate-700':'bg-white border-gray-200'} border rounded-2xl p-6 max-w-sm w-full shadow-2xl relative`}>
-        <button onClick={()=>setModal(false)} className="absolute top-4 right-4 text-slate-400 hover:text-white"><X className="w-5 h-5"/></button>
-        <h3 className="text-lg font-bold mb-4 flex items-center gap-2"><Download className="w-5 h-5 text-orange-500"/>Instalar SatsFlow</h3>
-        <div className="space-y-3 text-sm">
-          {['Pulsa el menú del navegador (⋮ o compartir).','Selecciona "Instalar aplicación" o "Añadir a pantalla de inicio".','La app funcionará con notificaciones aunque esté cerrada.'].map((t,i)=>(
-            <div key={i} className={`${dark?'bg-slate-800':'bg-gray-50'} p-3 rounded-lg flex gap-3`}>
-              <span className="w-6 h-6 rounded-full bg-orange-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">{i+1}</span>
-              <p className={dark?'text-slate-300':'text-gray-600'}>{t}</p>
-            </div>
-          ))}
-        </div>
-        <button onClick={()=>setModal(false)} className="mt-5 w-full bg-orange-500 hover:bg-orange-600 text-white font-medium py-2 rounded-lg transition-colors">Entendido</button>
-      </div>
-    </div>)}
-  </>);
-};
-
-/* ══════════════════════════════════════════════════════════
-   CONVERTER
-══════════════════════════════════════════════════════════ */
-const Converter=({btcPriceUsd,btcPriceEur})=>{
-  const{dark}=useTheme();
-  const[btc,setBtc]=useState('1');
-  const[sats,setSats]=useState('100000000');
-  const[usd,setUsd]=useState('');
-  const[eur,setEur]=useState('');
-  useEffect(()=>{if(btcPriceUsd>0&&btc)calc('btc',btc,btcPriceUsd,btcPriceEur);},[btcPriceUsd,btcPriceEur]);
-  function calc(f,raw,pU=btcPriceUsd,pE=btcPriceEur){
-    const v=parseFloat(raw),ok=!isNaN(v)&&v>=0;
-    if(f==='btc'){setBtc(raw);ok?(setSats((v*1e8).toFixed(0)),setUsd((v*pU).toFixed(2)),setEur((v*pE).toFixed(2))):(setSats(''),setUsd(''),setEur(''));}
-    if(f==='sats'){setSats(raw);if(ok){const b=v/1e8;setBtc(b.toFixed(8).replace(/\.?0+$/,''));setUsd((b*pU).toFixed(2));setEur((b*pE).toFixed(2));}else{setBtc('');setUsd('');setEur('');}}
-    if(f==='usd'){setUsd(raw);if(ok&&pU){const b=v/pU;setBtc(b.toFixed(8));setSats((b*1e8).toFixed(0));setEur((b*pE).toFixed(2));}else{setBtc('');setSats('');setEur('');}}
-    if(f==='eur'){setEur(raw);if(ok&&pE){const b=v/pE;setBtc(b.toFixed(8));setSats((b*1e8).toFixed(0));setUsd((b*pU).toFixed(2));}else{setBtc('');setSats('');setUsd('');}}
-  }
-  const inputClass=`w-full rounded-lg p-2.5 pl-8 border outline-none transition-all text-sm ${dark?'bg-slate-900 text-white border-slate-700':'bg-gray-50 text-slate-900 border-gray-200 focus:border-orange-400'}`;
-  const fields=[{id:'btc',label:'Bitcoin (BTC)',icon:'₿',color:'text-orange-500',border:'focus:border-orange-500',val:btc},{id:'sats',label:'Satoshis',icon:'⚡',color:'text-yellow-500',border:'focus:border-yellow-500',val:sats},{id:'usd',label:'Dólar (USD)',icon:'$',color:'text-green-500',border:'focus:border-green-500',val:usd},{id:'eur',label:'Euro (EUR)',icon:'€',color:'text-blue-500',border:'focus:border-blue-500',val:eur}];
-  return(<Card>
-    <h2 className="text-lg font-semibold flex items-center gap-2 mb-4"><ArrowRightLeft className="w-5 h-5 text-orange-500"/>Conversor</h2>
-    <div className="grid grid-cols-2 gap-3">
-      {fields.map(({id,label,icon,color,border,val})=>(<div key={id}>
-        <label className={`block text-xs font-medium mb-1 ${dark?'text-slate-400':'text-gray-500'}`}>{label}</label>
-        <div className="relative">
-          <input type="number" value={val} onChange={e=>calc(id,e.target.value)} className={`${inputClass} ${border}`} placeholder="0"/>
-          <span className={`absolute left-2.5 top-2.5 font-bold text-sm ${color}`}>{icon}</span>
-        </div>
-      </div>))}
+/* ══════ HOME ══════ */
+function renderHome(){
+  const pos=S.change24h>=0,pct=S.history.length>1?((S.history[S.history.length-1].price-S.history[0].price)/S.history[0].price*100).toFixed(2):'0.00';
+  const pctColor=parseFloat(pct)>=0?'#10b981':'#ef4444';
+  const upd=S.lastUpdated?S.lastUpdated.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'}):'—';
+  const chart=S.chartType==='area'?areaSVG(S.history):candleSVG(S.ohlc);
+  return`<div class="space-y">
+  <div class="card">
+    <div style="font-size:15px;font-weight:700;margin-bottom:12px">↔ Conversor</div>
+    <div class="grid-2">
+      <div><div style="font-size:10px;color:var(--text3);margin-bottom:4px;text-transform:uppercase">Bitcoin (BTC)</div><div style="position:relative"><span style="position:absolute;left:10px;top:9px;color:#f97316;font-weight:700">₿</span><input id="inp-btc" type="number" style="padding-left:28px" value="1" oninput="calcConv('btc',this.value)" placeholder="0"/></div></div>
+      <div><div style="font-size:10px;color:var(--text3);margin-bottom:4px;text-transform:uppercase">Satoshis</div><div style="position:relative"><span style="position:absolute;left:10px;top:9px;color:#eab308;font-weight:700">⚡</span><input id="inp-sats" type="number" style="padding-left:28px" value="100000000" oninput="calcConv('sats',this.value)" placeholder="0"/></div></div>
+      <div><div style="font-size:10px;color:var(--text3);margin-bottom:4px;text-transform:uppercase">Dólar (USD)</div><div style="position:relative"><span style="position:absolute;left:10px;top:9px;color:#10b981;font-weight:700">$</span><input id="inp-usd" type="number" style="padding-left:24px" oninput="calcConv('usd',this.value)" placeholder="0"/></div></div>
+      <div><div style="font-size:10px;color:var(--text3);margin-bottom:4px;text-transform:uppercase">Euro (EUR)</div><div style="position:relative"><span style="position:absolute;left:10px;top:9px;color:#3b82f6;font-weight:700">€</span><input id="inp-eur" type="number" style="padding-left:24px" oninput="calcConv('eur',this.value)" placeholder="0"/></div></div>
     </div>
-    <p className={`mt-3 text-xs text-center ${dark?'text-slate-500':'text-gray-400'}`}>1 BTC ≈ ${fmtNum(btcPriceUsd)} / €{fmtNum(btcPriceEur)}</p>
-  </Card>);
-};
+    <div style="font-size:10px;color:var(--text3);text-align:center;margin-top:8px">1 BTC ≈ $${fmtN(S.price.usd)} / €${fmtN(S.price.eur)}</div>
+  </div>
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+      <div><div style="font-size:15px;font-weight:700">📈 Historial</div><span style="font-size:11px;font-weight:600;color:${pctColor}">${parseFloat(pct)>=0?'+':''}${pct}%</span><span style="font-size:10px;color:var(--text3);margin-left:4px">en este periodo</span></div>
+      <div class="chart-type-wrap"><button class="chart-type-btn ${S.chartType==='area'?'active':''}" onclick="setChartType('area')">Área</button><button class="chart-type-btn ${S.chartType==='candle'?'active':''}" onclick="setChartType('candle')">Velas</button></div>
+    </div>
+    <div class="period-wrap">${['1','7','30','90','365'].map(d=>`<button class="period-btn ${S.days===d?'active':''}" onclick="setPeriod('${d}')">${d==='1'?'24h':d==='365'?'1A':d+'D'}</button>`).join('')}</div>
+    ${chart||'<div style="text-align:center;color:var(--text3);padding:20px">Cargando datos...</div>'}
+  </div>
+  <div class="grid-3">
+    <div class="stat-box"><div class="stat-label">Cap. Mercado</div><div class="stat-val" style="color:#3b82f6">${fmtBig(S.marketCap)}</div></div>
+    <div class="stat-box"><div class="stat-label">24h</div><div class="stat-val" style="color:${pos?'#10b981':'#ef4444'}">${pos?'+':''}${S.change24h.toFixed(2)}%</div></div>
+    <div class="stat-box"><div class="stat-label">Actualizado</div><div class="stat-val" style="font-size:12px;color:var(--text2)">${upd}</div></div>
+  </div>
+  <div style="font-size:10px;color:var(--text3);text-align:center">Precios: CoinGecko · Mempool: mempool.space · No es un consejo financiero.</div>
+</div>`;
+}
+function calcConv(f,raw){const v=parseFloat(raw),ok=!isNaN(v)&&v>=0,pU=S.price.usd,pE=S.price.eur;if(!ok){['btc','sats','usd','eur'].filter(x=>x!==f).forEach(x=>{const e=document.getElementById('inp-'+x);if(e)e.value='';});return;}if(f==='btc'){setI('sats',(v*1e8).toFixed(0));setI('usd',(v*pU).toFixed(2));setI('eur',(v*pE).toFixed(2));}if(f==='sats'){const b=v/1e8;setI('btc',b.toFixed(8).replace(/\.?0+$/,''));setI('usd',(b*pU).toFixed(2));setI('eur',(b*pE).toFixed(2));}if(f==='usd'&&pU){const b=v/pU;setI('btc',b.toFixed(8));setI('sats',(b*1e8).toFixed(0));setI('eur',(b*pE).toFixed(2));}if(f==='eur'&&pE){const b=v/pE;setI('btc',b.toFixed(8));setI('sats',(b*1e8).toFixed(0));setI('usd',(b*pU).toFixed(2));}}
+function setI(id,val){const e=document.getElementById('inp-'+id);if(e&&document.activeElement!==e)e.value=val;}
+function setChartType(t){S.chartType=t;renderTab('home');}
+function setPeriod(d){S.days=d;Promise.all([fetchPrice(),fetchOHLC()]).then(()=>renderTab('home'));}
 
-/* ══════════════════════════════════════════════════════════
-   PRICE CHART
-══════════════════════════════════════════════════════════ */
-const CandleChart=({data,dark})=>{
-  if(!data.length)return null;
-  const prices=data.flatMap(d=>[d.high,d.low]),minP=Math.min(...prices),maxP=Math.max(...prices),range=maxP-minP||1;
-  const W=600,H=220,PAD=8,LEFT=50,BOT=24;
-  const cW=Math.max(3,Math.floor((W-LEFT-PAD)/data.length)-2);
-  const toY=v=>PAD+(1-(v-minP)/range)*(H-PAD-BOT);
-  const toX=i=>LEFT+(i+0.5)*((W-LEFT-PAD)/data.length);
-  const step=Math.ceil(data.length/6);
-  const gridColor=dark?'#334155':'#e2e8f0';
-  const labelColor=dark?'#94a3b8':'#64748b';
-  return(<div className="w-full overflow-x-auto">
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{minWidth:'280px'}}>
-      {[0,0.25,0.5,0.75,1].map(t=>{const y=PAD+t*(H-PAD-BOT);const val=maxP-t*range;return(<g key={t}>
-        <line x1={LEFT} y1={y} x2={W-PAD} y2={y} stroke={gridColor} strokeDasharray="3 3"/>
-        <text x={LEFT-4} y={y+4} textAnchor="end" fill={labelColor} fontSize="9">${(val/1000).toFixed(0)}k</text>
-      </g>);})}
-      {data.map((d,i)=>{const up=d.close>=d.open,x=toX(i),yH=toY(d.high),yL=toY(d.low),yO=toY(d.open),yC=toY(d.close),bodyTop=Math.min(yO,yC),bodyH=Math.max(1,Math.abs(yO-yC));
-        return(<g key={d.ts} className={up?'candle-up':'candle-down'}>
-          <line x1={x} y1={yH} x2={x} y2={yL} strokeWidth="1" className="wick"/>
-          <rect x={x-cW/2} y={bodyTop} width={cW} height={bodyH} rx="1"/>
-          {i%step===0&&<text x={x} y={H-4} textAnchor="middle" fill={labelColor} fontSize="8">{d.date}</text>}
-        </g>);})}
-    </svg>
-  </div>);
-};
-
-const PriceChart=({data,ohlc,selectedDays,onDaysChange,loading})=>{
-  const{dark}=useTheme();
-  const[chartType,setChartType]=useState('area');
-  if(!data?.length)return(<Card className="h-[300px] flex items-center justify-center"><span className={`flex items-center gap-2 ${dark?'text-slate-500':'text-gray-400'}`}><RefreshCw className="w-4 h-4 animate-spin"/>Cargando...</span></Card>);
-  const last=data[data.length-1]?.price||0,first=data[0]?.price||0;
-  const pos=last>=first,color=pos?'#10b981':'#ef4444';
-  const pct=first?((last-first)/first*100).toFixed(2):'0.00';
-  const periods=[{label:'24h',value:'1'},{label:'7D',value:'7'},{label:'30D',value:'30'},{label:'90D',value:'90'},{label:'1A',value:'365'}];
-  const gridC=dark?'#334155':'#e2e8f0';
-  const axisC=dark?'#94a3b8':'#64748b';
-  const tooltipBg=dark?'#1e293b':'#fff';
-  const tooltipBorder=dark?'#334155':'#e2e8f0';
-  return(<Card>
-    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-3">
-      <div>
-        <h2 className="text-lg font-semibold flex items-center gap-2"><TrendingUp className="w-5 h-5 text-orange-500"/>Historial</h2>
-        <span className={`mt-1 inline-block text-sm font-medium px-2 py-0.5 rounded ${pos?'bg-emerald-500/10 text-emerald-500':'bg-red-500/10 text-red-500'}`}>{pos?'+':''}{pct}% <span className={`text-xs ml-1 ${dark?'text-slate-500':'text-gray-400'}`}>en este periodo</span></span>
+/* ══════ ANALYSIS ══════ */
+function renderAnalysis(){
+  const a=analyze();
+  if(!a)return`<div class="card" style="text-align:center;padding:40px;color:var(--text3)">Necesita historial de 30+ días.<br>Cambia el periodo a 30D en Inicio.</div>`;
+  const sigClass=a.signal==='COMPRAR'?'signal-buy':a.signal==='VENDER'?'signal-sell':'signal-neutral';
+  const sigColor=a.signal==='COMPRAR'?'#10b981':a.signal==='VENDER'?'#ef4444':'#eab308';
+  const sigIcon=a.signal==='COMPRAR'?'↑':a.signal==='VENDER'?'↓':'→';
+  const rsiColor=a.lastRSI<30?'#10b981':a.lastRSI>70?'#ef4444':'#eab308';
+  const rsiLabel=a.lastRSI<30?'Sobrevendido':a.lastRSI>70?'Sobrecomprado':'Neutral';
+  const macdBull=a.lMACD>a.lSig,smaBull=a.sma7>a.sma30;
+  const bbPos=a.last>a.bbU?'Sobrecomprado':a.last<a.bbL?'Sobrevendido':'En rango';
+  return`<div class="space-y">
+  <div class="card">
+    <div style="font-size:15px;font-weight:700;margin-bottom:12px">🧠 Análisis Técnico</div>
+    <div class="signal-banner ${sigClass}">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div><div style="font-size:10px;color:var(--text3);text-transform:uppercase;margin-bottom:4px">Señal del mercado</div><div style="font-size:24px;font-weight:800;color:${sigColor}">${a.signal}</div></div>
+        <div style="font-size:40px;font-weight:900;color:${sigColor}">${sigIcon}</div>
       </div>
-      <div className="flex flex-col items-end gap-2 w-full sm:w-auto">
-        <div className="flex gap-1">
-          {['area','candle'].map(t=><button key={t} onClick={()=>setChartType(t)} className={`px-2.5 py-1 text-xs rounded-md transition-all ${chartType===t?'bg-orange-500 text-white':dark?'bg-slate-700 text-slate-400 hover:text-white':'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>{t==='area'?'Área':'Velas'}</button>)}
-        </div>
-        <div className={`flex p-1 rounded-lg border w-full sm:w-auto ${dark?'bg-slate-900 border-slate-700':'bg-gray-100 border-gray-200'}`}>
-          {periods.map(p=><button key={p.value} onClick={()=>onDaysChange(p.value)} disabled={loading} className={`px-2.5 py-1.5 text-xs font-medium rounded-md transition-all flex-1 sm:flex-none ${selectedDays===p.value?dark?'bg-slate-700 text-white':'bg-white text-slate-900 shadow-sm':dark?'text-slate-400 hover:text-white':'text-gray-500 hover:text-gray-900'}`}>{p.label}</button>)}
-        </div>
+      <div style="margin-top:10px">
+        <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px"><span style="color:#10b981;font-weight:600">Alcista ${a.bullPct}%</span><span style="color:#ef4444;font-weight:600">${a.bearPct}% Bajista</span></div>
+        <div style="display:flex;border-radius:999px;overflow:hidden;height:6px"><div style="width:${a.bullPct}%;background:#10b981"></div><div style="width:${a.bearPct}%;background:#ef4444"></div></div>
       </div>
     </div>
-    <div className="h-[220px] relative">
-      {loading&&<div className="absolute inset-0 z-10 flex items-center justify-center rounded-lg backdrop-blur-sm"><RefreshCw className="w-8 h-8 text-orange-500 animate-spin"/></div>}
-      {chartType==='area'?(<ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={data}>
-          <defs><linearGradient id="gP" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={color} stopOpacity={0.3}/><stop offset="95%" stopColor={color} stopOpacity={0}/></linearGradient></defs>
-          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridC}/>
-          <XAxis dataKey="date" stroke={axisC} tick={{fontSize:9}} tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={30}/>
-          <YAxis stroke={axisC} tick={{fontSize:9}} tickFormatter={v=>`$${(v/1000).toFixed(0)}k`} tickLine={false} axisLine={false} domain={['auto','auto']} width={40}/>
-          <Tooltip contentStyle={{background:tooltipBg,border:`1px solid ${tooltipBorder}`,borderRadius:'8px',fontSize:'12px'}} labelFormatter={(l,p)=>p[0]?.payload?.fullDate||l} formatter={v=>[`$${v.toLocaleString()}`,'Precio']}/>
-          <Area type="monotone" dataKey="price" stroke={color} fill="url(#gP)" strokeWidth={2} animationDuration={600}/>
-        </AreaChart>
-      </ResponsiveContainer>):(<CandleChart data={ohlc} dark={dark}/>)}
+    <div class="grid-2" style="gap:8px">
+      <div class="stat-box"><div class="stat-label">RSI (14)</div><div class="stat-val" style="color:${rsiColor}">${a.lastRSI.toFixed(1)}</div><div style="font-size:9px;color:var(--text3)">${rsiLabel}</div></div>
+      <div class="stat-box"><div class="stat-label">MACD</div><div class="stat-val" style="color:${macdBull?'#10b981':'#ef4444'}">${a.lMACD?.toFixed(0)}</div><div style="font-size:9px;color:var(--text3)">${macdBull?'↑ Alcista':'↓ Bajista'}</div></div>
+      <div class="stat-box"><div class="stat-label">MA7 vs MA30</div><div class="stat-val" style="font-size:11px;color:${smaBull?'#10b981':'#ef4444'}">${smaBull?'Golden Cross':'Death Cross'}</div><div style="font-size:9px;color:var(--text3)">${smaBull?'Alcista':'Bajista'}</div></div>
+      <div class="stat-box"><div class="stat-label">Bollinger</div><div class="stat-val" style="font-size:11px;color:${bbPos==='En rango'?'#3b82f6':'#eab308'}">${bbPos}</div></div>
     </div>
-  </Card>);
-};
+  </div>
+  <div class="card">
+    <div style="font-size:14px;font-weight:600;margin-bottom:10px">Soporte &amp; Resistencia</div>
+    <div class="sr-row" style="background:rgba(239,68,68,.06);border-color:rgba(239,68,68,.3)"><span style="font-size:12px;color:var(--text2)">🔴 Resistencia</span><span style="font-size:13px;font-weight:700;color:#ef4444;font-family:monospace">$${fmtN(a.resistance,0)}</span></div>
+    <div class="sr-row" style="background:rgba(249,115,22,.06);border-color:rgba(249,115,22,.3)"><span style="font-size:12px;color:var(--text2)">🟠 Precio actual</span><span style="font-size:13px;font-weight:700;color:#f97316;font-family:monospace">$${fmtN(a.last,0)}</span></div>
+    <div class="sr-row" style="background:rgba(16,185,129,.06);border-color:rgba(16,185,129,.3)"><span style="font-size:12px;color:var(--text2)">🟢 Soporte</span><span style="font-size:13px;font-weight:700;color:#10b981;font-family:monospace">$${fmtN(a.support,0)}</span></div>
+  </div>
+  <div class="card"><div style="font-size:13px;font-weight:600;margin-bottom:6px;color:var(--text2)">RSI (últimos períodos)</div>${miniLine(a.rsiData,'#a855f7',65,[{val:70,color:'#ef4444'},{val:30,color:'#10b981'}])}<div style="font-size:10px;color:var(--text3);margin-top:4px">RSI &lt;30 sobrevendido · RSI &gt;70 sobrecomprado</div></div>
+  <div class="card"><div style="font-size:13px;font-weight:600;margin-bottom:6px;color:var(--text2)">MACD</div>${miniLine(a.macdData,'#3b82f6',65,[])}<div style="font-size:10px;color:var(--text3);margin-top:4px">MACD cruza arriba = alcista · Cruza abajo = bajista</div></div>
+  <div style="font-size:10px;color:var(--text3);text-align:center">⚠️ No garantiza resultados futuros. No es un consejo financiero.</div>
+</div>`;
+}
 
-/* ══════════════════════════════════════════════════════════
-   TECHNICAL ANALYSIS PANEL
-══════════════════════════════════════════════════════════ */
-const TechnicalPanel=({history})=>{
-  const{dark}=useTheme();
-  const analysis=useMemo(()=>{
-    if(!history.length)return null;
-    return analyzeMarket(history.map(h=>h.price));
-  },[history]);
-
-  if(!analysis)return(<Card className="h-48 flex items-center justify-center"><span className={`text-sm ${dark?'text-slate-500':'text-gray-400'}`}>Cargando análisis... (necesita historial de 30 días)</span></Card>);
-
-  const{rsi,sma7,sma30,macd,macdSignal,bbUpper,bbLower,bbMiddle,support,resistance,bullPct,bearPct,signal,signalColor,rsiData,macdData}=analysis;
-  const rsiNum=parseFloat(rsi);
-  const rsiColor=rsiNum<30?'text-emerald-500':rsiNum>70?'text-red-500':'text-yellow-500';
-  const rsiLabel=rsiNum<30?'Sobrevendido':rsiNum>70?'Sobrecomprado':'Neutral';
-  const lastPrice=history[history.length-1]?.price||0;
-  const gridC=dark?'#334155':'#e2e8f0';
-  const axisC=dark?'#94a3b8':'#64748b';
-  const tooltipBg=dark?'#1e293b':'#fff';
-  const tooltipBorder=dark?'#334155':'#e2e8f0';
-
-  return(<div className="space-y-4">
-    {/* Signal banner */}
-    <Card>
-      <h2 className="text-lg font-semibold flex items-center gap-2 mb-4"><Brain className="w-5 h-5 text-purple-500"/>Análisis Técnico</h2>
-      <div className={`rounded-xl p-4 border mb-4 ${signalColor==='emerald'?'bg-emerald-500/10 border-emerald-500/30':signalColor==='red'?'bg-red-500/10 border-red-500/30':'bg-yellow-500/10 border-yellow-500/30'}`}>
-        <div className="flex items-center justify-between">
-          <div>
-            <p className={`text-xs uppercase tracking-wider mb-1 ${dark?'text-slate-400':'text-gray-500'}`}>Señal del mercado</p>
-            <p className={`text-2xl font-bold ${signalColor==='emerald'?'text-emerald-500':signalColor==='red'?'text-red-500':'text-yellow-500'}`}>{signal}</p>
-          </div>
-          <div className="text-right">
-            <div className={`text-4xl font-black ${signalColor==='emerald'?'text-emerald-500':signalColor==='red'?'text-red-500':'text-yellow-500'}`}>{analysis.signalIcon}</div>
-          </div>
-        </div>
-        {/* Bull/Bear bar */}
-        <div className="mt-3">
-          <div className="flex justify-between text-xs mb-1">
-            <span className="text-emerald-500 font-medium">Alcista {bullPct}%</span>
-            <span className="text-red-500 font-medium">{bearPct}% Bajista</span>
-          </div>
-          <div className="w-full h-2 rounded-full overflow-hidden flex">
-            <div className="h-full bg-emerald-500 transition-all duration-1000" style={{width:`${bullPct}%`}}/>
-            <div className="h-full bg-red-500 transition-all duration-1000" style={{width:`${bearPct}%`}}/>
-          </div>
-        </div>
-      </div>
-      {/* Key indicators grid */}
-      <div className="grid grid-cols-2 gap-3">
-        {[
-          {label:'RSI (14)',val:`${rsi}`,sub:rsiLabel,color:rsiColor},
-          {label:'MACD',val:macd,sub:parseFloat(macd)>parseFloat(macdSignal)?'↑ Alcista':'↓ Bajista',color:parseFloat(macd)>parseFloat(macdSignal)?'text-emerald-500':'text-red-500'},
-          {label:'MA7 vs MA30',val:sma7>sma30?'Golden Cross':'Death Cross',sub:sma7>sma30?'Tendencia alcista':'Tendencia bajista',color:sma7>sma30?'text-emerald-500':'text-red-500'},
-          {label:'Bollinger',val:lastPrice>bbMiddle?'Banda superior':'Banda inferior',sub:lastPrice>bbUpper?'Sobrecomprado':lastPrice<bbLower?'Sobrevendido':'En rango',color:lastPrice>bbUpper||lastPrice<bbLower?'text-yellow-500':'text-blue-500'},
-        ].map(({label,val,sub,color})=>(<div key={label} className={`rounded-xl p-3 border ${dark?'bg-slate-900/70 border-slate-700/50':'bg-gray-50 border-gray-200'}`}>
-          <p className={`text-[10px] uppercase tracking-wider mb-1 ${dark?'text-slate-500':'text-gray-400'}`}>{label}</p>
-          <p className={`text-sm font-bold ${color}`}>{val}</p>
-          <p className={`text-[10px] mt-0.5 ${dark?'text-slate-400':'text-gray-500'}`}>{sub}</p>
-        </div>))}
-      </div>
-    </Card>
-
-    {/* Support & Resistance */}
-    <Card>
-      <h3 className={`text-sm font-semibold mb-3 ${dark?'text-slate-300':'text-gray-700'}`}>Soporte &amp; Resistencia</h3>
-      <div className="space-y-2">
-        {[
-          {label:'Resistencia',val:resistance,color:'text-red-500',bg:dark?'bg-red-500/10':'bg-red-50',border:'border-red-500/30'},
-          {label:'Precio actual',val:lastPrice,color:'text-orange-500',bg:dark?'bg-orange-500/10':'bg-orange-50',border:'border-orange-500/30'},
-          {label:'Soporte',val:support,color:'text-emerald-500',bg:dark?'bg-emerald-500/10':'bg-green-50',border:'border-emerald-500/30'},
-        ].map(({label,val,color,bg,border})=>(<div key={label} className={`flex justify-between items-center p-2.5 rounded-lg border ${bg} ${border}`}>
-          <span className={`text-xs font-medium ${dark?'text-slate-400':'text-gray-600'}`}>{label}</span>
-          <span className={`text-sm font-bold font-mono ${color}`}>${fmtNum(val,0)}</span>
-        </div>))}
-      </div>
-    </Card>
-
-    {/* RSI Chart */}
-    <Card>
-      <h3 className={`text-sm font-semibold mb-3 ${dark?'text-slate-300':'text-gray-700'}`}>RSI (14 períodos)</h3>
-      <div className="h-[120px]">
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={rsiData}>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridC}/>
-            <XAxis dataKey="i" hide/>
-            <YAxis domain={[0,100]} stroke={axisC} tick={{fontSize:9}} tickLine={false} axisLine={false} width={28} ticks={[30,50,70]}/>
-            <ReferenceLine y={70} stroke="#ef4444" strokeDasharray="4 4" label={{value:'70',fill:'#ef4444',fontSize:8}}/>
-            <ReferenceLine y={30} stroke="#10b981" strokeDasharray="4 4" label={{value:'30',fill:'#10b981',fontSize:8}}/>
-            <Tooltip contentStyle={{background:tooltipBg,border:`1px solid ${tooltipBorder}`,borderRadius:'8px',fontSize:'11px'}} formatter={v=>[v?.toFixed(1),'RSI']}/>
-            <Line type="monotone" dataKey="rsi" stroke="#a855f7" strokeWidth={2} dot={false} animationDuration={600}/>
-          </LineChart>
-        </ResponsiveContainer>
-      </div>
-      <p className={`text-[10px] mt-2 ${dark?'text-slate-600':'text-gray-400'}`}>RSI &lt;30 = sobrevendido (posible rebote) · RSI &gt;70 = sobrecomprado (posible corrección)</p>
-    </Card>
-
-    {/* MACD Chart */}
-    <Card>
-      <h3 className={`text-sm font-semibold mb-3 ${dark?'text-slate-300':'text-gray-700'}`}>MACD</h3>
-      <div className="h-[120px]">
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={macdData}>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridC}/>
-            <XAxis dataKey="i" hide/>
-            <YAxis stroke={axisC} tick={{fontSize:9}} tickLine={false} axisLine={false} width={40} tickFormatter={v=>v?.toFixed(0)}/>
-            <ReferenceLine y={0} stroke={dark?'#475569':'#94a3b8'} strokeWidth={1}/>
-            <Tooltip contentStyle={{background:tooltipBg,border:`1px solid ${tooltipBorder}`,borderRadius:'8px',fontSize:'11px'}} formatter={(v,n)=>[v?.toFixed(1),n==='macd'?'MACD':'Señal']}/>
-            <Line type="monotone" dataKey="macd" stroke="#3b82f6" strokeWidth={2} dot={false}/>
-            <Line type="monotone" dataKey="signal" stroke="#f97316" strokeWidth={1.5} dot={false} strokeDasharray="4 2"/>
-          </LineChart>
-        </ResponsiveContainer>
-      </div>
-      <p className={`text-[10px] mt-2 ${dark?'text-slate-600':'text-gray-400'}`}>Azul cruza sobre naranja = señal alcista · Azul cruza bajo naranja = señal bajista</p>
-    </Card>
-
-    <p className={`text-xs text-center ${dark?'text-slate-600':'text-gray-400'}`}>⚠️ El análisis técnico no garantiza resultados futuros. No es un consejo financiero.</p>
-  </div>);
-};
-
-/* ══════════════════════════════════════════════════════════
-   MARKET PANEL
-══════════════════════════════════════════════════════════ */
-const FearGreedGauge=({value})=>{
-  const color=value<=25?'#ef4444':value<=45?'#f97316':value<=55?'#eab308':value<=75?'#84cc16':'#10b981';
-  const labelEs=value<=25?'Miedo extremo':value<=45?'Miedo':value<=55?'Neutral':value<=75?'Codicia':'Codicia extrema';
-  const toRad=deg=>(deg*Math.PI)/180;
-  const r=70,cx=90,cy=90,angle=-90+(value/100)*180;
-  const x=cx+r*Math.cos(toRad(angle)),y=cy+r*Math.sin(toRad(angle));
+/* ══════ MARKET ══════ */
+function renderMarket(){
+  if(!S.marketData)return`<div class="card" style="text-align:center;padding:40px;color:var(--text3)"><span class="spin">⏳</span><br><br>Cargando datos de mercado...</div>`;
+  const m=S.marketData,mi=S.miningData,fg=m.fearGreed,dom=m.dominance;
+  const fgColor=fg.value<=25?'#ef4444':fg.value<=45?'#f97316':fg.value<=55?'#eab308':fg.value<=75?'#84cc16':'#10b981';
+  const fgLabel=fg.value<=25?'Miedo extremo':fg.value<=45?'Miedo':fg.value<=55?'Neutral':fg.value<=75?'Codicia':'Codicia extrema';
+  const toRad=d=>(d*Math.PI)/180,r=65,cx=90,cy=88,angle=-90+(fg.value/100)*180;
+  const nx=cx+r*Math.cos(toRad(angle)),ny=cy+r*Math.sin(toRad(angle));
   const segs=[{c:'#ef4444',s:-90,e:-54},{c:'#f97316',s:-54,e:-18},{c:'#eab308',s:-18,e:18},{c:'#84cc16',s:18,e:54},{c:'#10b981',s:54,e:90}];
   const arc=(s,e)=>{const x1=cx+r*Math.cos(toRad(s)),y1=cy+r*Math.sin(toRad(s)),x2=cx+r*Math.cos(toRad(e)),y2=cy+r*Math.sin(toRad(e));return`M ${x1} ${y1} A ${r} ${r} 0 0 1 ${x2} ${y2}`;};
-  return(<div className="flex flex-col items-center">
-    <svg viewBox="0 0 180 100" className="w-full max-w-[180px]">
-      {segs.map((s,i)=><path key={i} d={arc(s.s,s.e)} stroke={s.c} strokeWidth="14" fill="none" strokeLinecap="round" opacity="0.4"/>)}
-      <line x1={cx} y1={cy} x2={x} y2={y} stroke={color} strokeWidth="3" strokeLinecap="round"/>
-      <circle cx={cx} cy={cy} r="4" fill={color}/>
-      <text x={cx} y={cy-16} textAnchor="middle" fill="currentColor" fontSize="20" fontWeight="800">{value}</text>
-      <text x={cx} y={cy-4} textAnchor="middle" fill={color} fontSize="9" fontWeight="600">{labelEs}</text>
-    </svg>
-  </div>);
-};
-
-const MarketPanel=({marketData,miningData,loading})=>{
-  const{dark}=useTheme();
-  if(loading&&!marketData)return(<Card className="h-48 flex items-center justify-center"><span className={`flex items-center gap-2 ${dark?'text-slate-500':'text-gray-400'}`}><RefreshCw className="w-4 h-4 animate-spin"/>Cargando...</span></Card>);
-  const fg=marketData?.fearGreed||{value:50};
-  const dom=marketData?.dominance||{btc:'—',eth:'—'};
   const others=(100-parseFloat(dom.btc||0)-parseFloat(dom.eth||0)).toFixed(1);
-  return(<div className="space-y-4">
-    <Card>
-      <h2 className="text-lg font-semibold flex items-center gap-2 mb-3"><BarChart2 className="w-5 h-5 text-purple-500"/>Miedo &amp; Codicia</h2>
-      <FearGreedGauge value={fg.value}/>
-      <p className={`text-xs text-center mt-1 ${dark?'text-slate-500':'text-gray-400'}`}>Fuente: alternative.me · Actualización diaria</p>
-    </Card>
-    <Card>
-      <h2 className="text-lg font-semibold flex items-center gap-2 mb-4"><Globe className="w-5 h-5 text-blue-500"/>Dominancia</h2>
-      <div className="space-y-3">
-        {[{label:'Bitcoin (BTC)',val:dom.btc,color:'bg-orange-500',text:'text-orange-500'},{label:'Ethereum (ETH)',val:dom.eth,color:'bg-blue-500',text:'text-blue-500'},{label:'Resto',val:others,color:'bg-slate-500',text:dark?'text-slate-400':'text-gray-500'}].map(({label,val,color,text})=>(<div key={label}>
-          <div className="flex justify-between text-xs mb-1"><span className={dark?'text-slate-400':'text-gray-500'}>{label}</span><span className={`font-bold ${text}`}>{val}%</span></div>
-          <div className={`w-full rounded-full h-2 overflow-hidden ${dark?'bg-slate-900':'bg-gray-100'}`}><div className={`h-2 rounded-full ${color} transition-all duration-1000`} style={{width:`${parseFloat(val)||0}%`}}/></div>
-        </div>))}
-        <p className={`text-xs pt-1 ${dark?'text-slate-600':'text-gray-400'}`}>Cap. total: {fmtBig(marketData?.totalMarketCap)}</p>
-      </div>
-    </Card>
-    {miningData&&(<Card>
-      <h2 className="text-lg font-semibold flex items-center gap-2 mb-4"><Cpu className="w-5 h-5 text-green-500"/>Minería</h2>
-      <div className="grid grid-cols-2 gap-3 mb-4">
-        <div className={`rounded-xl p-3 text-center border ${dark?'bg-slate-900/70 border-slate-700/50':'bg-gray-50 border-gray-200'}`}>
-          <p className={`text-[10px] uppercase tracking-wider ${dark?'text-slate-500':'text-gray-400'}`}>Hashrate</p>
-          <p className="text-lg font-bold text-green-500 font-mono mt-0.5">{miningData.hashrate}</p>
-          <p className={`text-[10px] ${dark?'text-slate-500':'text-gray-400'}`}>EH/s</p>
-        </div>
-        <div className={`rounded-xl p-3 text-center border ${dark?'bg-slate-900/70 border-slate-700/50':'bg-gray-50 border-gray-200'}`}>
-          <p className={`text-[10px] uppercase tracking-wider ${dark?'text-slate-500':'text-gray-400'}`}>Cambio dificultad</p>
-          <p className={`text-lg font-bold font-mono mt-0.5 ${miningData.difficultyChange>=0?'text-red-500':'text-green-500'}`}>{miningData.difficultyChange>=0?'+':''}{(miningData.difficultyChange||0).toFixed(2)}%</p>
-        </div>
-      </div>
-      <div className={`rounded-xl p-3 border ${dark?'bg-slate-900/60 border-slate-700/40':'bg-gray-50 border-gray-200'}`}>
-        <div className="flex justify-between items-center mb-2">
-          <p className={`text-xs ${dark?'text-slate-400':'text-gray-500'}`}>Próximo ajuste de dificultad</p>
-          <span className={`text-xs ${dark?'text-slate-500':'text-gray-400'}`}>{miningData.remainingBlocks} bloques</span>
-        </div>
-        <div className={`w-full rounded-full h-2 overflow-hidden mb-1 ${dark?'bg-slate-800':'bg-gray-200'}`}><div className="h-2 rounded-full bg-green-500 transition-all duration-1000" style={{width:`${miningData.progressPercent||0}%`}}/></div>
-        <p className={`text-[10px] text-right ${dark?'text-slate-500':'text-gray-400'}`}>{(miningData.progressPercent||0).toFixed(1)}% completado</p>
-      </div>
-    </Card>)}
-  </div>);
-};
+  return`<div class="space-y">
+  <div class="card">
+    <div style="font-size:15px;font-weight:700;margin-bottom:12px">📊 Miedo &amp; Codicia</div>
+    <div style="display:flex;justify-content:center"><svg viewBox="0 0 180 100" style="width:180px;max-width:100%">${segs.map(s=>`<path d="${arc(s.s,s.e)}" stroke="${s.c}" stroke-width="13" fill="none" stroke-linecap="round" opacity=".4"/>`).join('')}<line x1="${cx}" y1="${cy}" x2="${nx}" y2="${ny}" stroke="${fgColor}" stroke-width="3" stroke-linecap="round"/><circle cx="${cx}" cy="${cy}" r="4" fill="${fgColor}"/><text x="${cx}" y="${cy-14}" text-anchor="middle" fill="${fgColor}" font-size="22" font-weight="800">${fg.value}</text><text x="${cx}" y="${cy-2}" text-anchor="middle" fill="${fgColor}" font-size="9" font-weight="600">${fgLabel}</text></svg></div>
+    <div style="font-size:10px;color:var(--text3);text-align:center;margin-top:4px">Fuente: alternative.me · Actualización diaria</div>
+  </div>
+  <div class="card">
+    <div style="font-size:15px;font-weight:700;margin-bottom:12px">🌍 Dominancia</div>
+    ${[{l:'Bitcoin (BTC)',v:dom.btc,c:'#f97316'},{l:'Ethereum (ETH)',v:dom.eth,c:'#3b82f6'},{l:'Resto',v:others,c:'#64748b'}].map(({l,v,c})=>`<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span style="color:var(--text2)">${l}</span><span style="font-weight:700;color:${c}">${v}%</span></div><div class="prog-track"><div class="prog-bar" style="width:${parseFloat(v)||0}%;background:${c}"></div></div></div>`).join('')}
+    <div style="font-size:10px;color:var(--text3)">Cap. total: ${fmtBig(m.totalMcap)}</div>
+  </div>
+  ${mi?`<div class="card"><div style="font-size:15px;font-weight:700;margin-bottom:12px">⛏️ Minería</div><div class="grid-2" style="margin-bottom:12px"><div class="stat-box"><div class="stat-label">Hashrate</div><div class="stat-val" style="color:#10b981">${mi.hashrate}</div><div style="font-size:9px;color:var(--text3)">EH/s</div></div><div class="stat-box"><div class="stat-label">Cambio dificultad</div><div class="stat-val" style="color:${mi.difficultyChange>=0?'#ef4444':'#10b981'}">${mi.difficultyChange>=0?'+':''}${(mi.difficultyChange||0).toFixed(2)}%</div></div></div><div style="font-size:12px;color:var(--text2);margin-bottom:6px;display:flex;justify-content:space-between"><span>Próximo ajuste</span><span style="color:var(--text3)">${mi.remainingBlocks} bloques</span></div><div class="prog-track"><div class="prog-bar" style="width:${mi.progressPercent||0}%;background:#22c55e"></div></div><div style="font-size:10px;color:var(--text3);text-align:right;margin-top:2px">${(mi.progressPercent||0).toFixed(1)}% completado</div></div>`:''}
+</div>`;
+}
 
-/* ══════════════════════════════════════════════════════════
-   MEMPOOL
-══════════════════════════════════════════════════════════ */
-const MempoolPanel=({btcPriceUsd,mempoolData,loading,onRefresh})=>{
-  const{dark}=useTheme();
-  const[txSize,setTxSize]=useState('250');
-  const[feeLevel,setFeeLevel]=useState('hour');
-  const[info,setInfo]=useState(false);
-  if(loading&&!mempoolData)return(<Card className="h-48 flex items-center justify-center"><span className={`flex items-center gap-2 ${dark?'text-slate-500':'text-gray-400'}`}><RefreshCw className="w-4 h-4 animate-spin"/>Cargando Mempool...</span></Card>);
-  if(!mempoolData)return(<Card className="h-48 flex items-center justify-center"><p className={`text-sm text-center ${dark?'text-slate-500':'text-gray-400'}`}>No se pudo cargar la Mempool.</p></Card>);
-  const{fees,mempool,network}=mempoolData;
-  const cong=mempool.congestion;
+/* ══════ MEMPOOL ══════ */
+function renderMempool(){
+  if(!S.mempool)return`<div class="card" style="text-align:center;padding:40px;color:var(--text3)">Cargando Mempool...</div>`;
+  const{fees,mempool,network}=S.mempool,cong=mempool.congestion;
   const congLabel=cong<20?'🟢 Baja':cong<50?'🟡 Media':cong<80?'🟠 Alta':'🔴 Muy alta';
-  const congColor=cong<20?'bg-emerald-500':cong<50?'bg-yellow-500':cong<80?'bg-orange-500':'bg-red-500';
-  const feeColor=f=>f<=5?'text-emerald-500':f<=30?'text-yellow-500':f<=80?'text-orange-500':'text-red-500';
-  const selRate=fees[feeLevel]||fees.hour;
-  const sz=Math.max(1,parseInt(txSize)||250);
-  const totSats=selRate*sz;
-  const totUsd=btcPriceUsd>0?((totSats/1e8)*btcPriceUsd).toFixed(4):'—';
+  const congColor=cong<20?'#10b981':cong<50?'#eab308':cong<80?'#f97316':'#ef4444';
+  const feeColor=f=>f<=5?'#10b981':f<=30?'#eab308':f<=80?'#f97316':'#ef4444';
+  const selRate=fees[S.feeLevel]||fees.hour,totSats=selRate*S.txSize;
+  const totUsd=S.price.usd>0?((totSats/1e8)*S.price.usd).toFixed(4):'—';
   const daysHalv=network.blocksToHalving>0?Math.round((network.blocksToHalving*10)/1440):null;
-  const inputClass=`w-full rounded-lg px-2 py-1.5 border outline-none text-sm ${dark?'bg-slate-800 text-white border-slate-600 focus:border-purple-500':'bg-gray-50 text-slate-900 border-gray-200 focus:border-purple-400'}`;
-  const cards=[{label:'Rápido',fee:fees.fastest,time:'~10 min',border:dark?'border-red-500/30':'border-red-200',icon:'⚡'},{label:'30 min',fee:fees.halfHour,time:'~30 min',border:dark?'border-orange-500/30':'border-orange-200',icon:'🟠'},{label:'1 hora',fee:fees.hour,time:'~60 min',border:dark?'border-yellow-500/30':'border-yellow-200',icon:'🕐'},{label:'Eco',fee:fees.economy,time:'Horas',border:dark?'border-blue-500/30':'border-blue-200',icon:'💤'}];
-  return(<Card>
-    <div className="flex items-center justify-between mb-4">
-      <h2 className="text-lg font-semibold flex items-center gap-2"><Activity className="w-5 h-5 text-purple-500"/>Mempool &amp; Fees</h2>
-      <div className="flex gap-2">
-        <button onClick={()=>setInfo(v=>!v)} className={`p-1.5 rounded-lg transition-colors ${dark?'text-slate-400 hover:text-white hover:bg-slate-700':'text-gray-400 hover:text-gray-700 hover:bg-gray-100'}`}><Info className="w-4 h-4"/></button>
-        <button onClick={onRefresh} className={`p-1.5 rounded-lg transition-colors ${loading?'animate-spin':''} ${dark?'text-slate-400 hover:text-white hover:bg-slate-700':'text-gray-400 hover:text-gray-700 hover:bg-gray-100'}`}><RefreshCw className="w-4 h-4"/></button>
-      </div>
+  const cards=[{l:'Rápido',f:fees.fastest,t:'~10m',ic:'⚡'},{l:'30 min',f:fees.halfHour,t:'~30m',ic:'🟠'},{l:'1 hora',f:fees.hour,t:'~60m',ic:'🕐'},{l:'Eco',f:fees.economy,t:'Horas',ic:'💤'}];
+  return`<div class="space-y">
+  <div class="card">
+    <div style="font-size:15px;font-weight:700;margin-bottom:12px">⛓️ Mempool &amp; Fees</div>
+    <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px"><span style="color:var(--text2)">Congestión</span><span style="font-weight:600">${congLabel}</span></div>
+    <div class="cong-track"><div class="cong-bar" style="width:${cong}%;background:${congColor}"></div></div>
+    <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text3);margin-top:4px;margin-bottom:14px"><span>${mempool.txCount.toLocaleString()} tx</span><span>${mempool.vsize} MB</span></div>
+    <div class="grid-4">${cards.map(({l,f,t,ic})=>`<div class="fee-card"><span style="font-size:15px">${ic}</span><span style="font-size:9px;color:var(--text3);text-transform:uppercase">${l}</span><span style="font-size:16px;font-weight:700;font-family:monospace;color:${feeColor(f)}">${f}</span><span style="font-size:9px;color:var(--text3)">s/vB</span><span style="font-size:9px;color:var(--text2)">${t}</span></div>`).join('')}</div>
+  </div>
+  <div class="card">
+    <div style="font-size:15px;font-weight:700;margin-bottom:12px">⚡ Calculadora</div>
+    <div class="grid-2" style="margin-bottom:10px">
+      <div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Bytes</div><input id="tx-size" type="number" value="${S.txSize}" min="1" oninput="S.txSize=Math.max(1,parseInt(this.value)||250);renderTab('mempool')"/></div>
+      <div><div style="font-size:10px;color:var(--text3);margin-bottom:4px">Prioridad</div><select id="fee-level" onchange="S.feeLevel=this.value;renderTab('mempool')"><option value="fastest" ${S.feeLevel==='fastest'?'selected':''}>⚡ Rápido</option><option value="halfHour" ${S.feeLevel==='halfHour'?'selected':''}>🟠 30 min</option><option value="hour" ${S.feeLevel==='hour'?'selected':''}>🕐 1 hora</option><option value="economy" ${S.feeLevel==='economy'?'selected':''}>💤 Eco</option><option value="minimum" ${S.feeLevel==='minimum'?'selected':''}>🐢 Mínima</option></select></div>
     </div>
-    {info&&(<div className={`border rounded-xl p-3 text-xs space-y-1 mb-4 animate-fadeIn ${dark?'bg-slate-900/80 border-slate-700 text-slate-400':'bg-gray-50 border-gray-200 text-gray-500'}`}>
-      <p><span className="font-medium">sat/vByte</span> — tarifa por byte virtual.</p>
-      <p>Datos de <span className="text-purple-500">mempool.space</span>. Actualización cada 30 s.</p>
-    </div>)}
-    <div className="mb-4">
-      <div className="flex justify-between text-xs mb-1.5"><span className={dark?'text-slate-400':'text-gray-500'}>Congestión</span><span className="font-medium">{congLabel}</span></div>
-      <div className={`w-full rounded-full h-2.5 overflow-hidden ${dark?'bg-slate-900':'bg-gray-100'}`}><div className={`h-2.5 rounded-full congestion-bar ${congColor}`} style={{width:`${cong}%`}}/></div>
-      <div className={`flex justify-between text-[10px] mt-1 ${dark?'text-slate-600':'text-gray-400'}`}><span>{mempool.txCount.toLocaleString()} tx</span><span>{mempool.vsize} MB</span></div>
-    </div>
-    <div className="grid grid-cols-4 gap-1.5 mb-4">
-      {cards.map(({label,fee,time,border,icon})=>(<div key={label} className={`rounded-xl p-2 border flex flex-col items-center gap-0.5 text-center ${dark?'bg-slate-900/80':'bg-gray-50'} ${border}`}>
-        <span className="text-sm">{icon}</span>
-        <span className={`text-[9px] uppercase ${dark?'text-slate-400':'text-gray-500'}`}>{label}</span>
-        <span className={`text-base font-bold font-mono ${feeColor(fee)}`}>{fee}</span>
-        <span className={`text-[9px] ${dark?'text-slate-500':'text-gray-400'}`}>s/vB</span>
-        <span className={`text-[9px] ${dark?'text-slate-400':'text-gray-500'}`}>{time}</span>
-      </div>))}
-    </div>
-    <div className={`rounded-xl p-3 border mb-4 ${dark?'bg-slate-900/60 border-slate-700/60':'bg-gray-50 border-gray-200'}`}>
-      <p className="text-sm font-medium flex items-center gap-1.5 mb-2"><Zap className="w-4 h-4 text-yellow-500"/>Calculadora</p>
-      <div className="grid grid-cols-2 gap-2 mb-2">
-        <div><label className={`block text-[10px] mb-1 ${dark?'text-slate-400':'text-gray-500'}`}>Bytes</label><input type="number" value={txSize} onChange={e=>setTxSize(e.target.value)} min="1" className={inputClass}/></div>
-        <div><label className={`block text-[10px] mb-1 ${dark?'text-slate-400':'text-gray-500'}`}>Prioridad</label>
-          <select value={feeLevel} onChange={e=>setFeeLevel(e.target.value)} className={inputClass}>
-            <option value="fastest">⚡ Rápido</option><option value="halfHour">🟠 30 min</option>
-            <option value="hour">🕐 1 hora</option><option value="economy">💤 Eco</option><option value="minimum">🐢 Mín</option>
-          </select>
-        </div>
-      </div>
-      <div className="grid grid-cols-3 gap-1.5 text-center">
-        {[{l:'sat/vB',v:selRate,c:'text-yellow-500'},{l:'Sats',v:totSats.toLocaleString(),c:'text-orange-500'},{l:'USD',v:`$${totUsd}`,c:'text-green-500'}].map(({l,v,c})=>(<div key={l} className={`rounded-lg p-1.5 ${dark?'bg-slate-800':'bg-white border border-gray-200'}`}><p className={`text-[9px] ${dark?'text-slate-500':'text-gray-400'}`}>{l}</p><p className={`text-sm font-bold font-mono ${c}`}>{v}</p></div>))}
-      </div>
-    </div>
-    {network.height>0&&(<div className="grid grid-cols-2 gap-2 text-center">
-      <div className={`rounded-xl p-2.5 border ${dark?'bg-slate-900/60 border-slate-700/40':'bg-gray-50 border-gray-200'}`}><p className={`text-[9px] uppercase ${dark?'text-slate-500':'text-gray-400'}`}>Bloque</p><p className="text-sm font-bold font-mono">#{network.height.toLocaleString()}</p></div>
-      <div className={`rounded-xl p-2.5 border ${dark?'bg-slate-900/60 border-slate-700/40':'bg-gray-50 border-gray-200'}`}><p className={`text-[9px] uppercase ${dark?'text-slate-500':'text-gray-400'}`}>Halving</p><p className="text-sm font-bold font-mono text-orange-500">{daysHalv!=null?`~${daysHalv}d`:'—'}</p></div>
-    </div>)}
-  </Card>);
-};
+    <div class="grid-3"><div class="stat-box"><div class="stat-label">sat/vByte</div><div class="stat-val" style="color:#eab308">${selRate}</div></div><div class="stat-box"><div class="stat-label">Sats</div><div class="stat-val" style="color:#f97316;font-size:12px">${totSats.toLocaleString()}</div></div><div class="stat-box"><div class="stat-label">USD</div><div class="stat-val" style="color:#10b981;font-size:12px">$${totUsd}</div></div></div>
+    <div style="font-size:10px;color:var(--text3);text-align:center;margin-top:8px">P2PKH≈250B · SegWit≈140B · Taproot≈110B</div>
+  </div>
+  ${network.height>0?`<div class="grid-2"><div class="stat-box"><div class="stat-label">Bloque actual</div><div class="stat-val" style="font-size:13px">#${network.height.toLocaleString()}</div></div><div class="stat-box"><div class="stat-label">Próximo Halving</div><div class="stat-val" style="color:#f97316">${daysHalv?`~${daysHalv} días`:'—'}</div><div style="font-size:9px;color:var(--text3)">${network.blocksToHalving.toLocaleString()} bloques</div></div></div>`:''}
+</div>`;
+}
 
-/* ══════════════════════════════════════════════════════════
-   NEWS
-══════════════════════════════════════════════════════════ */
-const NewsPanel=({news,loading,onRefresh})=>{
-  const{dark}=useTheme();
-  if(loading&&!news.length)return(<Card className="h-64 flex items-center justify-center"><span className={`flex items-center gap-2 ${dark?'text-slate-500':'text-gray-400'}`}><RefreshCw className="w-4 h-4 animate-spin"/>Cargando noticias...</span></Card>);
-  return(<Card>
-    <div className="flex items-center justify-between mb-4">
-      <h2 className="text-lg font-semibold flex items-center gap-2"><Newspaper className="w-5 h-5 text-blue-500"/>Noticias Bitcoin</h2>
-      <button onClick={onRefresh} className={`p-1.5 rounded-lg transition-colors ${loading?'animate-spin':''} ${dark?'text-slate-400 hover:text-white hover:bg-slate-700':'text-gray-400 hover:text-gray-700 hover:bg-gray-100'}`}><RefreshCw className="w-4 h-4"/></button>
+/* ══════ ATM ══════ */
+function renderATM(){
+  // Pre-render map container con altura visible
+  const alreadyLoaded=S.atmLoaded;
+  return`<div class="space-y"><div class="card">
+    <div style="font-size:15px;font-weight:700;margin-bottom:12px">🏧 Cajeros Bitcoin cercanos</div>
+    <div id="atm-status" style="text-align:center;padding:20px;${alreadyLoaded?'display:none':''}">
+      <div style="font-size:40px;margin-bottom:12px">📍</div>
+      <div style="font-weight:600;margin-bottom:6px">Encuentra cajeros Bitcoin cerca de ti</div>
+      <div style="font-size:12px;color:var(--text3);margin-bottom:16px">Usaremos tu ubicación para buscar en un radio de ~50 km</div>
+      <button class="btn-orange" onclick="loadATM()">🗺️ Buscar cerca de mí</button>
     </div>
-    {!news.length?(<p className={`text-sm text-center py-8 ${dark?'text-slate-500':'text-gray-400'}`}>No se pudieron cargar las noticias.</p>):(
-      <div className="space-y-2">
-        {news.map(n=>(<a key={n.id} href={n.url} target="_blank" rel="noopener noreferrer"
-          className={`block border rounded-xl p-3 transition-all group ${dark?'bg-slate-900/60 hover:bg-slate-700/60 border-slate-700/60 hover:border-slate-600':'bg-gray-50 hover:bg-gray-100 border-gray-200'}`}>
-          <div className="flex items-start justify-between gap-2">
-            <p className={`text-sm leading-snug line-clamp-2 flex-1 group-hover:text-orange-500 transition-colors ${dark?'text-slate-200':'text-gray-700'}`}>{n.title}</p>
-            <ExternalLink className={`w-3.5 h-3.5 flex-shrink-0 mt-0.5 ${dark?'text-slate-500':'text-gray-400'}`}/>
-          </div>
-          <div className="flex items-center gap-3 mt-2">
-            <span className="text-[10px] text-blue-500 font-medium">{n.source}</span>
-            <span className={`text-[10px] ${dark?'text-slate-500':'text-gray-400'}`}>{timeAgo(n.publishedAt)}</span>
-          </div>
-        </a>))}
-      </div>
-    )}
-  </Card>);
-};
+    <div id="atm-count" style="font-size:12px;color:#10b981;margin-bottom:8px;font-weight:600;${alreadyLoaded?'':'display:none'}"></div>
+    <div id="map-container" style="height:360px;border-radius:12px;overflow:hidden;${alreadyLoaded?'':'display:none'}"></div>
+    <div id="atm-tip" style="font-size:10px;color:var(--text3);text-align:center;margin-top:6px;${alreadyLoaded?'':'display:none'}">🟠 Cajeros/comercios Bitcoin · 📍 Tu posición · Datos: BTCMap.org</div>
+    ${alreadyLoaded?'<button class="btn-ghost" style="width:100%;margin-top:8px" onclick="reloadATM()">🔄 Actualizar</button>':''}
+  </div></div>`;
+}
+function initATM(){
+  if(!S.atmLoaded) return; // espera a que el usuario pulse el botón
+}
+async function reloadATM(){
+  S.atmLoaded=false;
+  if(S.leafletMap){S.leafletMap.remove();S.leafletMap=null;}
+  renderTab('atm');
+  await loadATM();
+}
+async function loadATM(){
+  const st=document.getElementById('atm-status');
+  if(!st)return;
+  st.innerHTML=`<div style="font-size:13px;color:var(--text3)"><span class="spin">📍</span> Obteniendo tu ubicación...</div>`;
+  try{
+    const pos=await new Promise((res,rej)=>navigator.geolocation.getCurrentPosition(res,rej,{timeout:15000,enableHighAccuracy:false}));
+    const{latitude:lat,longitude:lng}=pos.coords;
+    st.innerHTML=`<div style="font-size:13px;color:var(--text3)"><span class="spin">🔍</span> Buscando cajeros Bitcoin...</div>`;
 
-/* ══════════════════════════════════════════════════════════
-   ATM MAP
-══════════════════════════════════════════════════════════ */
-const ATMMap=()=>{
-  const{dark}=useTheme();
-  const mapRef=useRef(null);
-  const leafletMap=useRef(null);
-  const[status,setStatus]=useState('idle');
-  const[atmCount,setAtmCount]=useState(0);
-  const[error,setError]=useState('');
-
-  const loadMap=useCallback(async()=>{
-    setStatus('locating');setError('');
-    try{
-      const pos=await new Promise((res,rej)=>navigator.geolocation.getCurrentPosition(res,rej,{timeout:10000}));
-      const{latitude:lat,longitude:lng}=pos.coords;
-      setStatus('loading');
-      if(!leafletMap.current&&mapRef.current){
-        leafletMap.current=L.map(mapRef.current).setView([lat,lng],13);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap'}).addTo(leafletMap.current);
-      }else if(leafletMap.current){
-        leafletMap.current.setView([lat,lng],13);
-      }
-      // User marker
-      const userIcon=L.divIcon({html:`<div style="background:#f97316;width:16px;height:16px;border-radius:50%;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.4)"></div>`,iconSize:[16,16],iconAnchor:[8,8],className:''});
-      L.marker([lat,lng],{icon:userIcon}).addTo(leafletMap.current).bindPopup('<b>📍 Tu ubicación</b>');
-      const atms=await fetchATMs(lat,lng);
-      setAtmCount(atms.length);
-      const atmIcon=L.divIcon({html:`<div style="background:#f59e0b;width:14px;height:14px;border-radius:3px;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;font-size:8px">₿</div>`,iconSize:[14,14],iconAnchor:[7,7],className:''});
-      atms.forEach(a=>{
-        if(leafletMap.current)L.marker([a.lat,a.lng],{icon:atmIcon}).addTo(leafletMap.current).bindPopup(`<b>${a.name}</b><br/><span style="font-size:11px;color:#94a3b8">${a.operator||a.type}${a.address?'<br/>'+a.address:''}</span>`);
-      });
-      setStatus('done');
-    }catch(e){
-      setError(e.code===1?'Permiso de ubicación denegado. Actívalo en los ajustes del navegador.':e.message||'Error al cargar el mapa.');
-      setStatus('error');
+    // Mostrar contenedor del mapa con altura
+    const mapDiv=document.getElementById('map-container');
+    if(mapDiv){
+      mapDiv.style.display='block';
+      mapDiv.style.height='360px';
     }
-  },[]);
 
-  useEffect(()=>{return()=>{if(leafletMap.current){leafletMap.current.remove();leafletMap.current=null;}};},[]);
+    // Pequeña espera para que el DOM pinte el contenedor antes de Leaflet
+    await new Promise(r=>setTimeout(r,100));
 
-  return(<Card>
-    <div className="flex items-center justify-between mb-4">
-      <h2 className="text-lg font-semibold flex items-center gap-2"><MapPin className="w-5 h-5 text-orange-500"/>Cajeros Bitcoin</h2>
-      {status==='done'&&(<span className="text-xs text-emerald-500 font-medium">{atmCount} encontrados</span>)}
-    </div>
-    {status==='idle'&&(<div className="flex flex-col items-center py-8 gap-4">
-      <div className={`w-16 h-16 rounded-full flex items-center justify-center ${dark?'bg-slate-700':'bg-gray-100'}`}><MapPin className="w-8 h-8 text-orange-500"/></div>
-      <div className="text-center">
-        <p className="font-medium mb-1">Encuentra cajeros Bitcoin cercanos</p>
-        <p className={`text-sm ${dark?'text-slate-400':'text-gray-500'}`}>Usaremos tu ubicación para buscar en un radio de ~50 km</p>
-      </div>
-      <button onClick={loadMap} className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2.5 rounded-xl font-medium transition-colors flex items-center gap-2">
-        <Navigation className="w-4 h-4"/>Buscar cerca de mí
-      </button>
-    </div>)}
-    {(status==='locating'||status==='loading')&&(<div className="flex flex-col items-center py-8 gap-3">
-      <RefreshCw className="w-8 h-8 text-orange-500 animate-spin"/>
-      <p className={`text-sm ${dark?'text-slate-400':'text-gray-500'}`}>{status==='locating'?'Obteniendo tu ubicación...':'Buscando cajeros Bitcoin...'}</p>
-    </div>)}
-    {status==='error'&&(<div className="flex flex-col items-center py-6 gap-4">
-      <p className="text-red-500 text-sm text-center">{error}</p>
-      <button onClick={loadMap} className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${dark?'bg-slate-700 hover:bg-slate-600':'bg-gray-100 hover:bg-gray-200'}`}>Reintentar</button>
-    </div>)}
-    <div ref={mapRef} className={`rounded-xl overflow-hidden transition-all ${status==='done'?'h-[380px]':'h-0'}`} style={{zIndex:1}}/>
-    {status==='done'&&(<>
-      <p className={`text-[10px] mt-2 text-center ${dark?'text-slate-600':'text-gray-400'}`}>🟠 Cajeros/comercios Bitcoin · 🟠 Tu ubicación · Datos: BTCMap.org</p>
-      <button onClick={loadMap} className={`mt-2 w-full py-1.5 rounded-lg text-xs font-medium transition-colors ${dark?'bg-slate-700 hover:bg-slate-600 text-slate-300':'bg-gray-100 hover:bg-gray-200 text-gray-600'}`}>🔄 Actualizar</button>
-    </>)}
-  </Card>);
-};
+    if(!S.leafletMap&&mapDiv){
+      S.leafletMap=L.map(mapDiv,{zoomControl:true,attributionControl:true}).setView([lat,lng],13);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+        attribution:'© <a href="https://openstreetmap.org">OpenStreetMap</a>',
+        maxZoom:19
+      }).addTo(S.leafletMap);
+    }else if(S.leafletMap){
+      S.leafletMap.setView([lat,lng],13);
+    }
+    S.leafletMap.invalidateSize();
 
-/* ══════════════════════════════════════════════════════════
-   ALERTS
-══════════════════════════════════════════════════════════ */
-const AlertsPanel=({currentPriceUsd,currentPriceEur})=>{
-  const{dark}=useTheme();
-  const[alerts,setAlerts]=useState([]);
-  const[target,setTarget]=useState('');
-  const[currency,setCurrency]=useState('usd');
-  const[notifPerm,setNotifPerm]=useState('default');
-  const[notifMsg,setNotifMsg]=useState('');
-  useEffect(()=>{window.dbHelpers?.loadAlerts().then(s=>{if(s.length)setAlerts(s);});setNotifPerm(window.Notification?.permission||'unsupported');},[]);
-  useEffect(()=>{if(!alerts.length)return;window.dbHelpers?.saveAlerts(alerts);navigator.serviceWorker?.ready.then(reg=>reg.active?.postMessage({type:'CHECK_ALERTS',alerts}));},[alerts]);
-  useEffect(()=>{if(!currentPriceUsd)return;let changed=false;const updated=alerts.map(a=>{if(a.triggered)return a;const p=a.currency==='usd'?currentPriceUsd:currentPriceEur;const hit=a.condition==='above'?p>=a.targetPrice:p<=a.targetPrice;if(hit){const sym=a.currency==='usd'?'$':'€';showNotif('⚡ Alerta SatsFlow',`BTC ha ${a.condition==='above'?'subido sobre':'bajado de'} ${sym}${a.targetPrice.toLocaleString()}`);changed=true;return{...a,triggered:true};}return a;});if(changed)setAlerts(updated);},[currentPriceUsd,currentPriceEur]);
-  const activateNotifs=async()=>{const r=await(window.Notification?Notification.requestPermission():Promise.resolve('unsupported'));setNotifPerm(r);setNotifMsg(r==='granted'?'✅ Activadas':r==='denied'?'❌ Denegado. Actívalas en Ajustes.':'');};
-  const addAlert=()=>{const val=parseFloat(target);if(isNaN(val)||val<=0)return;const price=currency==='usd'?currentPriceUsd:currentPriceEur;setAlerts(prev=>[...prev,{id:Date.now().toString(),targetPrice:val,currency,condition:val>price?'above':'below',triggered:false}]);setTarget('');};
-  const inputClass=`bg-slate-900 text-white rounded-lg py-2 pl-6 pr-2 border border-slate-700 focus:border-orange-500 outline-none text-sm w-full`;
-  return(<Card>
-    <h2 className="text-lg font-semibold flex items-center gap-2 mb-4"><Bell className="w-5 h-5 text-orange-500"/>Alertas de precio</h2>
-    {'Notification' in window&&notifPerm!=='granted'&&(<div className="mb-4 bg-orange-500/10 border border-orange-500/30 rounded-xl p-3 flex items-start gap-3">
-      <Bell className="w-4 h-4 text-orange-400 mt-0.5 flex-shrink-0"/>
-      <div className="flex-1"><p className="text-xs text-orange-300 font-medium">Activa las notificaciones</p>{notifMsg&&<p className="text-xs mt-1">{notifMsg}</p>}</div>
-      <button onClick={activateNotifs} className="bg-orange-500 hover:bg-orange-600 text-white text-xs px-3 py-1.5 rounded-lg flex-shrink-0">Activar</button>
-    </div>)}
-    {notifPerm==='granted'&&(<div className="mb-4 bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-3 flex items-center gap-2"><CheckCircle className="w-4 h-4 text-emerald-400 flex-shrink-0"/><p className="text-xs text-emerald-300">Notificaciones activas con app cerrada.</p></div>)}
-    <div className="flex gap-2 mb-4">
-      <div className="relative flex-1"><span className={`absolute left-2.5 top-2.5 text-sm ${dark?'text-slate-500':'text-gray-400'}`}>{currency==='usd'?'$':'€'}</span>
-        <input type="number" value={target} onChange={e=>setTarget(e.target.value)} onKeyDown={e=>e.key==='Enter'&&addAlert()} className={inputClass} placeholder="Precio objetivo"/>
-      </div>
-      <select value={currency} onChange={e=>setCurrency(e.target.value)} className={`${dark?'bg-slate-900 text-white border-slate-700':'bg-gray-50 text-slate-900 border-gray-200'} rounded-lg px-2 border outline-none text-sm`}>
-        <option value="usd">USD</option><option value="eur">EUR</option>
-      </select>
-      <button onClick={addAlert} className="bg-orange-500 hover:bg-orange-600 text-white p-2 rounded-lg transition-colors flex-shrink-0"><BellPlus className="w-5 h-5"/></button>
-    </div>
-    <div className="space-y-2 overflow-y-auto max-h-80">
-      {alerts.length===0?(<p className={`text-center text-sm py-8 ${dark?'text-slate-500':'text-gray-400'}`}>Sin alertas activas.<br/>Introduce un precio y pulsa +.</p>):alerts.map(a=>(
-        <div key={a.id} className={`flex items-center justify-between p-3 rounded-xl border ${a.triggered?'bg-yellow-500/10 border-yellow-500/40':dark?'bg-slate-700/40 border-slate-600/60':'bg-gray-50 border-gray-200'}`}>
-          <div className="flex items-center gap-3">
-            {a.triggered?<AlertTriangle className="w-5 h-5 text-yellow-500 animate-pulse flex-shrink-0"/>:<div className={`w-2 h-2 rounded-full flex-shrink-0 ${a.condition==='above'?'bg-green-500':'bg-red-500'}`}/>}
-            <div><p className="text-sm font-medium">{a.condition==='above'?'↑':'↓'} {a.currency==='usd'?'$':'€'}{a.targetPrice.toLocaleString()}</p>
-              <p className={`text-xs ${dark?'text-slate-400':'text-gray-500'}`}>{a.triggered?'¡DISPARADA!':'Pendiente'}</p></div>
-          </div>
-          <button onClick={()=>setAlerts(prev=>prev.filter(x=>x.id!==a.id))} className={`p-1 ${dark?'text-slate-500 hover:text-red-400':'text-gray-400 hover:text-red-500'}`}><Trash2 className="w-4 h-4"/></button>
-        </div>
-      ))}
-    </div>
-  </Card>);
-};
+    // Marcador usuario
+    const uIcon=L.divIcon({html:`<div style="background:#f97316;width:16px;height:16px;border-radius:50%;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,.5)"></div>`,iconSize:[16,16],iconAnchor:[8,8],className:''});
+    L.marker([lat,lng],{icon:uIcon}).addTo(S.leafletMap).bindPopup('<b>📍 Tu ubicación</b>').openPopup();
 
-/* ══════════════════════════════════════════════════════════
-   APP
-══════════════════════════════════════════════════════════ */
-const TABS=[
-  {id:'home',   label:'Inicio',   icon:Home},
-  {id:'analysis',label:'Análisis',icon:Brain},
-  {id:'market', label:'Mercado',  icon:BarChart2},
-  {id:'mempool',label:'Mempool',  icon:Activity},
-  {id:'atm',    label:'Cajeros',  icon:MapPin},
-  {id:'news',   label:'Noticias', icon:Newspaper},
-  {id:'alerts', label:'Alertas',  icon:Bell},
-];
+    // Cajeros via BTCMap
+    let atms=[];
+    try{
+      const delta=0.4;
+      const r=await fetch(`https://api.btcmap.org/v2/elements?lat=${lat-delta}&lon=${lng-delta}&lat2=${lat+delta}&lon2=${lng+delta}`,{signal:AbortSignal.timeout(10000)});
+      if(r.ok){
+        const j=await r.json();
+        atms=(j||[]).filter(e=>{
+          const tags=e.osm_json?.tags||{};
+          return tags['payment:bitcoin']==='yes'||tags['currency:XBT']==='yes'||tags['bitcoin']==='yes'||tags['amenity']==='atm';
+        }).slice(0,50).map(e=>({
+          lat:e.osm_json?.lat||e.osm_json?.center?.lat,
+          lng:e.osm_json?.lon||e.osm_json?.center?.lon,
+          name:e.osm_json?.tags?.name||'Punto Bitcoin',
+          op:e.osm_json?.tags?.operator||'',
+          type:e.osm_json?.tags?.['amenity']==='atm'?'🏧 ATM':'🏪 Comercio'
+        })).filter(e=>e.lat&&e.lng);
+      }
+    }catch(err){console.warn('BTCMap:',err);}
 
-const App=()=>{
-  const[dark,setDark]=useState(()=>localStorage.getItem('satsflow-theme')!=='light');
-  const toggleTheme=useCallback(()=>{setDark(d=>{const next=!d;localStorage.setItem('satsflow-theme',next?'dark':'light');return next;});},[]);
+    const aIcon=L.divIcon({html:`<div style="background:#f59e0b;width:13px;height:13px;border-radius:3px;border:2px solid white;box-shadow:0 2px 5px rgba(0,0,0,.4);font-size:8px;display:flex;align-items:center;justify-content:center;color:white;font-weight:700">₿</div>`,iconSize:[13,13],iconAnchor:[6,6],className:''});
+    atms.forEach(a=>{
+      if(S.leafletMap)L.marker([a.lat,a.lng],{icon:aIcon}).addTo(S.leafletMap)
+        .bindPopup(`<b>${a.name}</b><br><small>${a.type}${a.op?' · '+a.op:''}</small>`);
+    });
 
-  useEffect(()=>{
-    document.documentElement.classList.toggle('dark',dark);
-    document.body.style.background=dark?'#020617':'#f8fafc';
-    document.body.style.color=dark?'#f8fafc':'#0f172a';
-  },[dark]);
+    setTimeout(()=>S.leafletMap?.invalidateSize(),300);
 
-  const[tab,setTab]=useState('home');
-  const[data,setData]=useState({current_price:{usd:0,eur:0},change24h:0,marketCap:0,history:[]});
-  const[ohlc,setOhlc]=useState([]);
-  const[mempool,setMempool]=useState(null);
-  const[marketData,setMarketData]=useState(null);
-  const[miningData,setMiningData]=useState(null);
-  const[news,setNews]=useState([]);
-  const[days,setDays]=useState('30');
-  const[lChart,setLC]=useState(false);
-  const[lMem,setLM]=useState(true);
-  const[lMarket,setLMkt]=useState(true);
-  const[lNews,setLNews]=useState(true);
-  const[lastUpd,setLU]=useState(null);
+    // Actualizar UI
+    const cnt=document.getElementById('atm-count');
+    if(cnt){cnt.textContent=atms.length>0?`✅ ${atms.length} cajeros/comercios encontrados`:'ℹ️ No se encontraron cajeros Bitcoin en esta zona';cnt.style.display='block';}
+    const tip=document.getElementById('atm-tip');if(tip)tip.style.display='block';
+    st.style.display='none';
+    S.atmLoaded=true;
+    // Añadir botón actualizar
+    const card=st.closest('.card');
+    if(card&&!card.querySelector('.btn-ghost')){
+      const btn=document.createElement('button');
+      btn.className='btn-ghost';btn.style.cssText='width:100%;margin-top:8px';
+      btn.textContent='🔄 Actualizar';btn.onclick=reloadATM;
+      card.appendChild(btn);
+    }
+  }catch(e){
+    const msg=e.code===1?'Permiso de ubicación denegado. Ve a los ajustes del navegador y activa la ubicación para esta página.':e.name==='TimeoutError'?'Tiempo de espera agotado. Comprueba tu conexión.':'No se pudo cargar el mapa. Inténtalo de nuevo.';
+    if(st)st.innerHTML=`<div style="color:#ef4444;font-size:13px;margin-bottom:14px;line-height:1.5">${msg}</div><button class="btn-orange" onclick="loadATM()">🔄 Reintentar</button>`;
+  }
+}
 
-  const loadPrice=useCallback(async(d=days)=>{if(d!==days)setLC(true);const[nd,oh]=await Promise.all([fetchBitcoinData(d),fetchOHLC(d)]);setData(nd);setOhlc(oh);setLC(false);setLU(new Date());},[days]);
-  const loadMempool=useCallback(async()=>{setLM(true);setMempool(await fetchMempoolData());setLM(false);},[]);
-  const loadMarket=useCallback(async()=>{setLMkt(true);const[md,mi]=await Promise.all([fetchMarketData(),fetchMiningData()]);setMarketData(md);setMiningData(mi);setLMkt(false);},[]);
-  const loadNews=useCallback(async()=>{setLNews(true);setNews(await fetchNews());setLNews(false);},[]);
+/* ══════ NEWS ══════ */
+function renderNews(){
+  if(!S.news.length)return`<div class="card" style="text-align:center;padding:40px;color:var(--text3)"><span class="spin">📰</span><br><br>Cargando noticias...</div>`;
+  return`<div class="card"><div style="font-size:15px;font-weight:700;margin-bottom:12px">📰 Noticias Bitcoin</div>${S.news.map(n=>`<a href="${n.url}" target="_blank" rel="noopener noreferrer" class="news-item"><div style="font-size:13px;line-height:1.4;margin-bottom:6px">${n.title}</div><div style="display:flex;gap:10px;font-size:10px"><span style="color:#3b82f6;font-weight:600">${n.source}</span><span style="color:var(--text3)">${timeAgo(n.date.getTime())}</span></div></a>`).join('')}</div>`;
+}
 
-  useEffect(()=>{
-    loadPrice();loadMempool();loadMarket();loadNews();
-    const pi=setInterval(()=>loadPrice(days),60000);
-    const mi=setInterval(loadMempool,30000);
-    const mki=setInterval(loadMarket,120000);
-    const ni=setInterval(loadNews,300000);
-    return()=>{clearInterval(pi);clearInterval(mi);clearInterval(mki);clearInterval(ni);};
-  },[days]);
+/* ══════ ALERTS ══════ */
+function renderAlerts(){
+  const perm=S.notifPerm;
+  const banner=perm!=='granted'&&perm!=='unsupported'?`<div class="notif-banner"><span style="font-size:18px">🔔</span><div style="flex:1"><div style="font-size:12px;font-weight:600;color:#f97316">Activa las notificaciones</div><div style="font-size:11px;color:var(--text3);margin-top:2px">Para recibir alertas con la app cerrada.</div></div><button class="btn-orange" style="padding:6px 12px;font-size:12px" onclick="activateNotifs()">Activar</button></div>`:perm==='granted'?`<div class="notif-ok"><span>✅</span><div style="font-size:12px;color:#10b981">Notificaciones activas. Recibirás avisos aunque la app esté cerrada.</div></div>`:'';
+  return`<div class="card"><div style="font-size:15px;font-weight:700;margin-bottom:12px">🔔 Alertas de precio</div>${banner}<div class="input-row"><div style="position:relative;flex:1"><span id="curr-sym" style="position:absolute;left:10px;top:9px;color:var(--text3);font-size:13px">$</span><input id="alert-target" type="number" style="padding-left:26px" placeholder="Precio objetivo" onkeydown="if(event.key==='Enter')addAlert()"/></div><select id="alert-curr" style="width:80px" onchange="document.getElementById('curr-sym').textContent=this.value==='eur'?'€':'$'"><option value="usd">USD</option><option value="eur">EUR</option></select><button class="btn-orange" style="padding:8px 14px;flex-shrink:0" onclick="addAlert()">+</button></div><div id="alert-list">${S.alerts.length===0?`<div style="text-align:center;color:var(--text3);font-size:13px;padding:24px">Sin alertas activas.<br>Introduce un precio y pulsa +.</div>`:S.alerts.map(a=>`<div class="alert-item ${a.triggered?'triggered':''}"><div style="display:flex;align-items:center;gap:10px">${a.triggered?'<span style="color:#eab308;font-size:16px">⚠️</span>':`<div style="width:8px;height:8px;border-radius:50%;background:${a.condition==='above'?'#10b981':'#ef4444'}"></div>`}<div><div style="font-size:13px;font-weight:600">${a.condition==='above'?'↑':'↓'} ${a.currency==='usd'?'$':'€'}${a.targetPrice.toLocaleString()}</div><div style="font-size:10px;color:var(--text3)">${a.triggered?'¡DISPARADA!':'Pendiente'}</div></div></div><button onclick="removeAlert('${a.id}')" style="background:none;border:none;color:var(--text3);font-size:18px;padding:4px;cursor:pointer">✕</button></div>`).join('')}</div></div>`;
+}
+async function activateNotifs(){const r=await requestNotifPerm();if(r==='granted')showNotif('✅ SatsFlow','Notificaciones activadas.');renderTab('alerts');}
+function addAlert(){const t=document.getElementById('alert-target'),c=document.getElementById('alert-curr');if(!t||!c)return;const val=parseFloat(t.value);if(isNaN(val)||val<=0)return;const curr=c.value,price=curr==='usd'?S.price.usd:S.price.eur;S.alerts.push({id:Date.now().toString(),targetPrice:val,currency:curr,condition:val>price?'above':'below',triggered:false});saveAlerts();navigator.serviceWorker?.ready.then(reg=>reg.active?.postMessage({type:'CHECK_ALERTS',alerts:S.alerts}));renderTab('alerts');}
+function removeAlert(id){S.alerts=S.alerts.filter(a=>a.id!==id);saveAlerts();renderTab('alerts');}
+function checkAlerts(){if(!S.price.usd)return;let changed=false;S.alerts=S.alerts.map(a=>{if(a.triggered)return a;const p=a.currency==='usd'?S.price.usd:S.price.eur,hit=a.condition==='above'?p>=a.targetPrice:p<=a.targetPrice;if(hit){const sym=a.currency==='usd'?'$':'€';showNotif('⚡ Alerta SatsFlow',`BTC ha ${a.condition==='above'?'subido sobre':'bajado de'} ${sym}${a.targetPrice.toLocaleString()} — $${S.price.usd.toLocaleString()}`);changed=true;return{...a,triggered:true};}return a;});if(changed){saveAlerts();if(S.currentTab==='alerts')renderTab('alerts');}}
 
-  const ch=data.change24h||0,pos=ch>=0;
-  const headerBg=dark?'bg-slate-950/95':'bg-white/95';
-  const headerBorder=dark?'border-slate-800':'border-gray-200';
-  const navBg=dark?'bg-slate-900/95':'bg-white/95';
-  const navBorder=dark?'border-slate-800':'border-gray-200';
-  const activeTab=dark?'text-orange-500':'text-orange-500';
-  const inactiveTab=dark?'text-slate-500 hover:text-slate-300':'text-gray-400 hover:text-gray-600';
-
-  return(<ThemeCtx.Provider value={{dark,toggle:toggleTheme}}>
-    <div className={`min-h-screen flex flex-col ${dark?'bg-slate-950':'bg-gray-50'}`}>
-      {/* Header */}
-      <header className={`sticky top-0 z-30 ${headerBg} backdrop-blur border-b ${headerBorder} px-4 py-3`}>
-        <div className="max-w-5xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center shadow-md shadow-orange-500/30">
-              <Bitcoin className="w-5 h-5 text-white"/>
-            </div>
-            <div>
-              <h1 className="text-lg font-bold leading-none">SatsFlow</h1>
-              <p className={`text-[10px] ${dark?'text-slate-500':'text-gray-400'}`}>Bitcoin Tracker</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="text-right mr-1">
-              <p className="text-base font-mono font-bold">${data.current_price.usd.toLocaleString()}</p>
-              {ch!==0&&<p className={`text-xs flex items-center justify-end gap-0.5 ${pos?'text-emerald-500':'text-red-500'}`}>{pos?<ChevronUp className="w-3 h-3"/>:<ChevronDown className="w-3 h-3"/>}{Math.abs(ch).toFixed(2)}%</p>}
-            </div>
-            {/* Dark/Light toggle */}
-            <button onClick={toggleTheme} className={`p-2 rounded-lg border transition-colors ${dark?'bg-slate-800 border-slate-700 text-yellow-400 hover:bg-slate-700':'bg-gray-100 border-gray-200 text-slate-600 hover:bg-gray-200'}`} title={dark?'Modo claro':'Modo oscuro'}>
-              {dark?<Sun className="w-4 h-4"/>:<Moon className="w-4 h-4"/>}
-            </button>
-            <InstallPrompt/>
-          </div>
-        </div>
-      </header>
-
-      {/* Content */}
-      <main className="flex-1 px-4 py-5 pb-24 overflow-y-auto">
-        <div className="max-w-5xl mx-auto">
-          {tab==='home'&&(<div className="space-y-5 animate-fadeIn">
-            <Converter btcPriceUsd={data.current_price.usd} btcPriceEur={data.current_price.eur}/>
-            <PriceChart data={data.history} ohlc={ohlc} selectedDays={days} onDaysChange={d=>{setDays(d);loadPrice(d);}} loading={lChart}/>
-            <div className="grid grid-cols-3 gap-3">
-              {[{label:'Cap. mercado',val:fmtBig(data.marketCap),color:'text-blue-500'},{label:'Cambio 24h',val:`${pos?'+':''}${ch.toFixed(2)}%`,color:pos?'text-emerald-500':'text-red-500'},{label:'Actualizado',val:lastUpd?lastUpd.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'}):'—',color:dark?'text-slate-400':'text-gray-500'}].map(({label,val,color})=>(<div key={label} className={`rounded-xl p-3 border text-center ${dark?'bg-slate-800 border-slate-700':'bg-white border-gray-200 shadow-sm'}`}>
-                <p className={`text-[10px] uppercase tracking-wide ${dark?'text-slate-500':'text-gray-400'}`}>{label}</p>
-                <p className={`text-sm font-bold mt-0.5 ${color}`}>{val}</p>
-              </div>))}
-            </div>
-          </div>)}
-          {tab==='analysis'&&(<div className="animate-fadeIn"><TechnicalPanel history={data.history}/></div>)}
-          {tab==='market'&&(<div className="animate-fadeIn"><MarketPanel marketData={marketData} miningData={miningData} loading={lMarket}/></div>)}
-          {tab==='mempool'&&(<div className="animate-fadeIn"><MempoolPanel btcPriceUsd={data.current_price.usd} mempoolData={mempool} loading={lMem} onRefresh={loadMempool}/></div>)}
-          {tab==='atm'&&(<div className="animate-fadeIn"><ATMMap/></div>)}
-          {tab==='news'&&(<div className="animate-fadeIn"><NewsPanel news={news} loading={lNews} onRefresh={loadNews}/></div>)}
-          {tab==='alerts'&&(<div className="animate-fadeIn"><AlertsPanel currentPriceUsd={data.current_price.usd} currentPriceEur={data.current_price.eur}/></div>)}
-        </div>
-      </main>
-
-      {/* Tab Bar */}
-      <nav className={`fixed bottom-0 left-0 right-0 z-30 ${navBg} backdrop-blur border-t ${navBorder}`}>
-        <div className="max-w-5xl mx-auto flex overflow-x-auto">
-          {TABS.map(({id,label,icon:Icon})=>{
-            const active=tab===id;
-            return(<button key={id} onClick={()=>setTab(id)} className={`flex-1 flex flex-col items-center gap-0.5 py-2 px-1 transition-all min-w-[52px] relative ${active?activeTab:inactiveTab}`}>
-              {active&&<span className="absolute top-0 left-1/2 -translate-x-1/2 w-5 h-0.5 bg-orange-500 rounded-full"/>}
-              <Icon className="w-5 h-5"/>
-              <span className="text-[9px] font-medium whitespace-nowrap">{label}</span>
-            </button>);
-          })}
-        </div>
-      </nav>
-    </div>
-  </ThemeCtx.Provider>);
-};
-
-ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+/* ══════ INIT ══════ */
+async function init(){
+  S.alerts=await loadAlertsDB();
+  await fetchPrice();
+  renderTab('home');
+  // Carga el resto en segundo plano
+  Promise.all([fetchOHLC(),fetchMempool(),fetchMarket(),fetchMining(),fetchNews()]).then(()=>{renderCurrentTab();});
+  setInterval(async()=>{await fetchPrice();checkAlerts();renderCurrentTab();},60000);
+  setInterval(async()=>{await fetchMempool();if(S.currentTab==='mempool')renderTab('mempool');},30000);
+  setInterval(async()=>{await Promise.all([fetchMarket(),fetchMining()]);if(S.currentTab==='market')renderTab('market');},120000);
+  setInterval(async()=>{await fetchNews();if(S.currentTab==='news')renderTab('news');},300000);
+}
+init();
 </script>
 </body>
 </html>
