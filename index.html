@@ -396,6 +396,19 @@ function updateHeader(){
   const p=document.getElementById('header-price'),c=document.getElementById('header-change');
   if(p)p.textContent='$'+S.price.usd.toLocaleString();
   if(c){const pos=S.change24h>=0;c.textContent=(pos?'▲ +':'▼ ')+Math.abs(S.change24h).toFixed(2)+'%';c.style.color=pos?'#10b981':'#ef4444';}
+  // Forzar actualización del conversor en cuanto llega el precio
+  if(S.price.usd>0){
+    const btcEl=document.getElementById('inp-btc');
+    const usdEl=document.getElementById('inp-usd');
+    const eurEl=document.getElementById('inp-eur');
+    const satsEl=document.getElementById('inp-sats');
+    if(btcEl&&usdEl&&eurEl&&satsEl){
+      const btcVal=parseFloat(btcEl.value)||1;
+      usdEl.value=(btcVal*S.price.usd).toFixed(2);
+      eurEl.value=(btcVal*S.price.eur).toFixed(2);
+      satsEl.value=(btcVal*1e8).toFixed(0);
+    }
+  }
 }
 
 /* ══════ RENDER TABS ══════ */
