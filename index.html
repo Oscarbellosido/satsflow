@@ -393,21 +393,18 @@ function candleSVG(data){
 
 /* ══════ HEADER ══════ */
 function updateHeader(){
-  const p=document.getElementById('header-price'),c=document.getElementById('header-change');
+  const p=document.getElementById('header-price'),ch=document.getElementById('header-change');
   if(p)p.textContent='$'+S.price.usd.toLocaleString();
-  if(c){const pos=S.change24h>=0;c.textContent=(pos?'▲ +':'▼ ')+Math.abs(S.change24h).toFixed(2)+'%';c.style.color=pos?'#10b981':'#ef4444';}
-  // Forzar actualización del conversor en cuanto llega el precio
+  if(ch){const pos=S.change24h>=0;ch.textContent=(pos?'▲ +':'▼ ')+Math.abs(S.change24h).toFixed(2)+'%';ch.style.color=pos?'#10b981':'#ef4444';}
+  // Recalcular conversor con el precio nuevo, manteniendo el valor BTC actual
   if(S.price.usd>0){
-    const btcEl=document.getElementById('inp-btc');
-    const usdEl=document.getElementById('inp-usd');
-    const eurEl=document.getElementById('inp-eur');
-    const satsEl=document.getElementById('inp-sats');
-    if(btcEl&&usdEl&&eurEl&&satsEl){
-      const btcVal=parseFloat(btcEl.value)||1;
-      usdEl.value=(btcVal*S.price.usd).toFixed(2);
-      eurEl.value=(btcVal*S.price.eur).toFixed(2);
-      satsEl.value=(btcVal*1e8).toFixed(0);
-    }
+    const btc=parseFloat(S.conv_btc)||1;
+    S.conv_btc=btc;
+    S.conv_sats=(btc*1e8).toFixed(0);
+    S.conv_usd=(btc*S.price.usd).toFixed(2);
+    S.conv_eur=(btc*S.price.eur).toFixed(2);
+    // Actualizar DOM si los campos existen
+    setI('btc',S.conv_btc);setI('sats',S.conv_sats);setI('usd',S.conv_usd);setI('eur',S.conv_eur);
   }
 }
 
@@ -429,10 +426,10 @@ function renderHome(){
   <div class="card">
     <div style="font-size:15px;font-weight:700;margin-bottom:12px">↔ Conversor</div>
     <div class="grid-2">
-      <div><div style="font-size:10px;color:var(--text3);margin-bottom:4px;text-transform:uppercase">Bitcoin (BTC)</div><div style="position:relative"><span style="position:absolute;left:10px;top:9px;color:#f97316;font-weight:700">₿</span><input id="inp-btc" type="number" style="padding-left:28px" value="1" oninput="calcConv('btc',this.value)" placeholder="0"/></div></div>
-      <div><div style="font-size:10px;color:var(--text3);margin-bottom:4px;text-transform:uppercase">Satoshis</div><div style="position:relative"><span style="position:absolute;left:10px;top:9px;color:#eab308;font-weight:700">⚡</span><input id="inp-sats" type="number" style="padding-left:28px" value="100000000" oninput="calcConv('sats',this.value)" placeholder="0"/></div></div>
-      <div><div style="font-size:10px;color:var(--text3);margin-bottom:4px;text-transform:uppercase">Dólar (USD)</div><div style="position:relative"><span style="position:absolute;left:10px;top:9px;color:#10b981;font-weight:700">$</span><input id="inp-usd" type="number" style="padding-left:24px" oninput="calcConv('usd',this.value)" placeholder="0"/></div></div>
-      <div><div style="font-size:10px;color:var(--text3);margin-bottom:4px;text-transform:uppercase">Euro (EUR)</div><div style="position:relative"><span style="position:absolute;left:10px;top:9px;color:#3b82f6;font-weight:700">€</span><input id="inp-eur" type="number" style="padding-left:24px" oninput="calcConv('eur',this.value)" placeholder="0"/></div></div>
+      <div><div style="font-size:10px;color:var(--text3);margin-bottom:4px;text-transform:uppercase">Bitcoin (BTC)</div><div style="position:relative"><span style="position:absolute;left:10px;top:9px;color:#f97316;font-weight:700">₿</span><input id="inp-btc" type="number" style="padding-left:28px" value="${S.conv_btc||1}" oninput="calcConv('btc',this.value)" placeholder="0"/></div></div>
+      <div><div style="font-size:10px;color:var(--text3);margin-bottom:4px;text-transform:uppercase">Satoshis</div><div style="position:relative"><span style="position:absolute;left:10px;top:9px;color:#eab308;font-weight:700">⚡</span><input id="inp-sats" type="number" style="padding-left:28px" value="${S.conv_sats||100000000}" oninput="calcConv('sats',this.value)" placeholder="0"/></div></div>
+      <div><div style="font-size:10px;color:var(--text3);margin-bottom:4px;text-transform:uppercase">Dólar (USD)</div><div style="position:relative"><span style="position:absolute;left:10px;top:9px;color:#10b981;font-weight:700">$</span><input id="inp-usd" type="number" style="padding-left:24px" value="${S.conv_usd||''}" oninput="calcConv('usd',this.value)" placeholder="0"/></div></div>
+      <div><div style="font-size:10px;color:var(--text3);margin-bottom:4px;text-transform:uppercase">Euro (EUR)</div><div style="position:relative"><span style="position:absolute;left:10px;top:9px;color:#3b82f6;font-weight:700">€</span><input id="inp-eur" type="number" style="padding-left:24px" value="${S.conv_eur||''}" oninput="calcConv('eur',this.value)" placeholder="0"/></div></div>
     </div>
     <div style="font-size:10px;color:var(--text3);text-align:center;margin-top:8px">1 BTC ≈ $${fmtN(S.price.usd)} / €${fmtN(S.price.eur)}</div>
   </div>
@@ -452,7 +449,17 @@ function renderHome(){
   <div style="font-size:10px;color:var(--text3);text-align:center">Precios: CoinGecko · Mempool: mempool.space · No es un consejo financiero.</div>
 </div>`;
 }
-function calcConv(f,raw){const v=parseFloat(raw),ok=!isNaN(v)&&v>=0,pU=S.price.usd,pE=S.price.eur;if(!ok){['btc','sats','usd','eur'].filter(x=>x!==f).forEach(x=>{const e=document.getElementById('inp-'+x);if(e)e.value='';});return;}if(f==='btc'){setI('sats',(v*1e8).toFixed(0));setI('usd',(v*pU).toFixed(2));setI('eur',(v*pE).toFixed(2));}if(f==='sats'){const b=v/1e8;setI('btc',b.toFixed(8).replace(/\.?0+$/,''));setI('usd',(b*pU).toFixed(2));setI('eur',(b*pE).toFixed(2));}if(f==='usd'&&pU){const b=v/pU;setI('btc',b.toFixed(8));setI('sats',(b*1e8).toFixed(0));setI('eur',(b*pE).toFixed(2));}if(f==='eur'&&pE){const b=v/pE;setI('btc',b.toFixed(8));setI('sats',(b*1e8).toFixed(0));setI('usd',(b*pU).toFixed(2));}}
+function calcConv(f,raw){
+  const v=parseFloat(raw),ok=!isNaN(v)&&v>=0,pU=S.price.usd,pE=S.price.eur;
+  if(!ok){['btc','sats','usd','eur'].filter(x=>x!==f).forEach(x=>{const e=document.getElementById('inp-'+x);if(e)e.value='';});return;}
+  let btc=S.conv_btc||1,sats=S.conv_sats||1e8,usd=S.conv_usd||0,eur=S.conv_eur||0;
+  if(f==='btc'){btc=v;sats=(v*1e8).toFixed(0);usd=(v*pU).toFixed(2);eur=(v*pE).toFixed(2);}
+  else if(f==='sats'){const b=v/1e8;btc=b.toFixed(8).replace(/\.?0+$/,'');sats=v;usd=(b*pU).toFixed(2);eur=(b*pE).toFixed(2);}
+  else if(f==='usd'&&pU){const b=v/pU;btc=b.toFixed(8);sats=(b*1e8).toFixed(0);usd=v;eur=(b*pE).toFixed(2);}
+  else if(f==='eur'&&pE){const b=v/pE;btc=b.toFixed(8);sats=(b*1e8).toFixed(0);usd=(b*pU).toFixed(2);eur=v;}
+  S.conv_btc=btc;S.conv_sats=sats;S.conv_usd=usd;S.conv_eur=eur;
+  ['btc','sats','usd','eur'].filter(x=>x!==f).forEach(x=>setI(x,S['conv_'+x]));
+}
 function setI(id,val){const e=document.getElementById('inp-'+id);if(e&&document.activeElement!==e)e.value=val;}
 function setChartType(t){S.chartType=t;renderTab('home');}
 function setPeriod(d){S.days=d;Promise.all([fetchPrice(),fetchOHLC()]).then(()=>renderTab('home'));}
