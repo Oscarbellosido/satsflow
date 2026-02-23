@@ -2,14 +2,17 @@
   "name": "SatsFlow",
   "short_name": "SatsFlow",
   "description": "Conversor de Bitcoin y seguimiento de precios en tiempo real",
-  "start_url": "/",
+  "start_url": "/satsflow/",
   "display": "standalone",
   "background_color": "#0f172a",
   "theme_color": "#f97316",
   "orientation": "portrait-primary",
-  "scope": "/",
+  "scope": "/satsflow/",
   "lang": "es",
-  "categories": ["finance", "utilities"],
+  "categories": [
+    "finance",
+    "utilities"
+  ],
   "icons": [
     {
       "src": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/46/Bitcoin.svg/192px-Bitcoin.svg.png",
@@ -29,8 +32,13 @@
       "name": "Ver precio BTC",
       "short_name": "Precio",
       "description": "Consultar precio actual de Bitcoin",
-      "url": "/",
-      "icons": [{ "src": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/46/Bitcoin.svg/96px-Bitcoin.svg.png", "sizes": "96x96" }]
+      "url": "/satsflow/",
+      "icons": [
+        {
+          "src": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/46/Bitcoin.svg/96px-Bitcoin.svg.png",
+          "sizes": "96x96"
+        }
+      ]
     }
   ]
 }
